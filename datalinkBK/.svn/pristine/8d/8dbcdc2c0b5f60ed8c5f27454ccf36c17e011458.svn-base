@@ -1,0 +1,290 @@
+<?php
+
+class ItemModel {
+
+	protected $_table = 'm_item';
+	protected $_id = 'id_item';
+        protected $_table_trx_stock_detail = 't_trx_stock_detail';
+        protected $_id_trx_stock_detail = 'id_detail';
+        
+        protected $_table_item_stock = "t_item_stock";
+        
+        
+        //m_item_unit
+        protected $_table_unit = 'm_item_unit';
+        protected $_id_unit = 'id_unit';
+
+	public function getData($filter, $limit, $offset, $sortBy, $sortDir)
+	{
+		$data['id'] = $this->_id;
+	
+		$tableColumn = array($this->_id,'item_code', 'item_name', 'id_category', 'id_brand','id_unit');
+		
+		$query = DB::table($this->_table." as a")
+						->select(array($this->_id, 'a.item_code AS item_code', 'a.item_name AS item_name','b.category_name AS category_name','c.brand_name AS brand_name','d.unit_name AS unit_name'))
+						->leftJoin('m_item_category as b', 'a.id_category', '=', 'b.id_category')
+                                                ->leftJoin('m_item_brand as c', 'a.id_brand', '=', 'c.id_brand')
+                                                ->leftJoin('m_item_unit as d', 'a.id_unit', '=', 'd.id_unit')
+                                                ->where('a.is_deleted',0)
+						->where('a.owner', Crypt::decrypt(Session::get('owner')));
+		
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['item_code'])
+				$query->where('a.item_code', 'LIKE', '%'.$filter['item_code'].'%');
+                        if($filter['item_name'])
+				$query->where('a.item_name', 'LIKE', '%'.$filter['item_name'].'%');
+			if($filter['id_category'])
+				$query->where('a.id_category', 'LIKE', '%'.$filter['id_category'].'%');
+			if($filter['id_brand'])
+				$query->where('a.id_brand', 'LIKE', '%'.$filter['id_brand'].'%');
+                        if($filter['id_unit'])
+				$query->where('a.id_unit', 'LIKE', '%'.$filter['id_unit'].'%');
+				
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+	}
+        
+        public function getDataStock($filter, $limit, $offset, $sortBy, $sortDir){
+            
+            $data['id'] = 'a.'.$this->_id_trx_stock_detail;
+	
+		$tableColumn = (array('a.'.$this->_id_trx_stock_detail,'b.trx_date',
+                                                                                           'd.warehouse_name', 
+                                                                                           'c.trx_name', 
+                                                                                           'b.trx_code',
+                                                                                           'a.capital_price',
+                                                                                           'a.stock_in',
+                                                                                           'a.stock_out',
+                                                                                           'a.remaining_stock',
+                                                                                           'a.remaining_stock'));
+		
+		$query = DB::table($this->_table_trx_stock_detail." as a")
+						->select(array('a.'.$this->_id_trx_stock_detail,'b.trx_date as trx_date',
+                                                                                           'd.warehouse_name as warehouse_name', 
+                                                                                           'c.trx_name as trx_type', 
+                                                                                           DB::raw('CONCAT(b.trx_code, " ", b.no_ref) AS trx_no'),
+                                                                                           'a.capital_price as capital_price',
+                                                                                           'a.stock_in as stock_in',
+                                                                                           'a.stock_out as stock_out',
+                                                                                           'a.remaining_stock as remaining_stock',
+                                                                                           DB::raw('(a.remaining_stock * a.capital_price) AS balance')))
+						->leftJoin('t_trx_stock as b', 'a.id_trx', '=', 'b.id_trx')
+                                                ->leftJoin('d_trx as c', 'b.trx_code', '=', 'c.trx_code')
+                                                ->leftJoin('m_warehouse as d','d.id_warehouse','=','a.id_warehouse');
+		
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+                    if($filter['id_warehouse']){
+                       if($filter['id_warehouse'] != ""){ 
+			        	$query->where('a.id_warehouse', 'LIKE', '%'.$filter['id_warehouse'].'%');
+                       }            
+                    }
+                    
+                    if($filter['id_item']){
+                       if($filter['id_item'] != ""){ 
+			        	$query->where('a.id_item', 'LIKE', '%'.$filter['id_item'].'%');
+                       }            
+                    }
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+                        
+        }
+        
+        public function getDataTambahan($id_item,$id_warehouse){
+            if($id_warehouse != ""){
+                    $queryData = DB::table($this->_table_item_stock." as a")
+						->select(array(DB::raw('SUM(a.stock_initial) AS stock_initial'),
+                                                               DB::raw('SUM(a.stock_in) AS stock_in'),
+                                                               DB::raw('SUM(a.stock_out) AS stock_out'),
+                                                               DB::raw('SUM((a.stock_initial + a.stock_in) - a.stock_out ) AS remaining_stock'),
+                                                               DB::raw('(SUM((a.stock_initial + a.stock_in) - a.stock_out ) * b.cogs_price) AS balance')))
+                                                ->leftJoin('m_item as b', 'a.id_item', '=', 'b.id_item')
+                                                ->leftJoin('t_trx_stock_detail as c', 'b.id_item', '=', 'c.id_item')
+						->where('a.id_warehouse',$id_warehouse)
+                                                ->where('b.id_item',$id_item);
+            }else{
+                     $queryData = DB::table($this->_table_item_stock." as a")
+						->select(array(DB::raw('SUM(a.stock_initial) AS stock_initial'),
+                                                               DB::raw('SUM(a.stock_in) AS stock_in'),
+                                                               DB::raw('SUM(a.stock_out) AS stock_out'),
+                                                               DB::raw('SUM((a.stock_initial + a.stock_in) - a.stock_out ) AS remaining_stock'),
+                                                               DB::raw('(SUM((a.stock_initial + a.stock_in) - a.stock_out ) * b.cogs_price) AS balance')))
+                                                ->leftJoin('m_item as b', 'a.id_item', '=', 'b.id_item')
+                                                ->leftJoin('t_trx_stock_detail as c', 'b.id_item', '=', 'c.id_item')
+                                                ->where('b.id_item',$id_item);
+            }       
+		
+               $data['tambahan'] = $queryData->first();
+
+		if($data['tambahan'])
+		{
+			
+		}
+		else
+		{
+			$data = false;
+		}
+
+		return $data;
+            
+            
+        }
+
+	public function insertData($data)
+	{
+		try
+		{
+			DB::beginTransaction();
+                        
+                        if($data['tax'] != ""){
+                             $data['is_tax'] = 1;            
+                        }else{
+                             $data['is_tax'] = 0;
+                        }
+                        
+			$insertItem = array(
+				'owner' => Crypt::decrypt(Session::get('owner')),
+				'item_code'	=> $data['itemCode'],
+				'item_name'	=> $data['itemName'],
+				'barcode'	=> $data['barcode'],
+                                'id_unit'	=> $data['itemUnit'],
+				'id_category'	=> $data['itemCategory'],
+				'id_type'	=> $data['itemType'],
+                                'id_brand'	=> $data['itemBrand'],
+				'description'	=> $data['description'],
+				'is_tax'        => $data['is_tax'],
+                                'tax_type'      => $data['tax'],
+                                'status'	=> $data['status'],
+                                'is_stockable'  => ($data['itemType'] == 3 || $data['itemType'] == 4)?0:1,
+				'is_deleted'    => 0,
+				'created_by'    => Session::get('user_name'),
+				'created_at'    => DB::raw('now()')
+			);
+
+		   $return =  DB::table($this->_table)->insert($insertItem);
+                   
+                   DB::commit();
+                   
+                   return $return;
+		}catch(Exception $e)
+		{
+			DB::rollback();
+			return $e->getMessage();
+		}
+        return false;
+	}
+        
+        public function insertDataUnit($data){
+            
+            $insertArr = array(
+
+            'owner' => Crypt::decrypt(Session::get('owner')),
+            'unit_name'	=> $data['unit_name'],
+            'created_by' => Session::get('user_name'),
+            'created_at'=> DB::raw('now()')
+
+        );
+            return DB::table($this->_table_unit)->insert($insertArr);
+            
+        }
+
+	public function deleteData($id)
+	{
+        $updateArr = array(
+
+            'is_deleted'	=> 1,
+            'updated_by' => Session::get('user_name'),
+            'updated_at'=> DB::raw('now()'),
+            'deleted_at'=> DB::raw('now()')
+        );
+       
+		DB::table($this->_table)
+							->where($this->_id,$id)
+							->update($updateArr);
+		
+        return true;
+	}
+
+	public function getDetail($id)
+	{
+		$queryItem = DB::table($this->_table)
+						->select('*')
+						->where('is_deleted',0)
+						->where('id_item',$id)
+						->where('owner', Crypt::decrypt(Session::get('owner')));
+
+		$data['item'] = $queryItem->first();
+
+		if($data['item'])
+		{
+			
+		}
+		else
+		{
+			$data = false;
+		}
+
+		return $data;
+	}
+	
+	public function updateData($data)
+	{
+		if(empty($data['id'])) return 'Data Not Found';
+		try
+		{
+			DB::beginTransaction();
+                        if($data['tax'] != ""){
+                             $data['is_tax'] = 1;            
+                        }else{
+                             $data['is_tax'] = 0;
+                        }
+			$updateItem = array(
+				'owner' => Crypt::decrypt(Session::get('owner')),
+				'item_code'	=> $data['itemCode'],
+				'item_name'	=> $data['itemName'],
+				'barcode'	=> $data['barcode'],
+                                'id_unit'	=> $data['itemUnit'],
+				'id_category'	=> $data['itemCategory'],
+				'id_type'	=> $data['itemType'],
+                                'id_brand'	=> $data['itemBrand'],
+				'description'	=> $data['description'],
+				'is_tax'        => $data['is_tax'],
+                                'tax_type'      => $data['tax'],
+                                'status'	=> $data['status'],
+                                'min_stock'      => $data['minimumStock'],
+                                'max_stock'      => $data['maximumStock'],
+                                'status'	=> $data['status'],
+				'is_deleted'    => 0,
+				'created_by'    => Session::get('user_name'),
+				'created_at'    => DB::raw('now()')
+			);
+
+		   $return =  DB::table($this->_table)->where($this->_id,$data['id'])->update($updateItem);
+
+                   
+		   DB::commit();
+                   
+                   return $return;
+		}catch(Exception $e)
+		{
+			DB::rollback();
+			return $e->getMessage();
+		}
+        return true;
+	}
+	
+	
+}

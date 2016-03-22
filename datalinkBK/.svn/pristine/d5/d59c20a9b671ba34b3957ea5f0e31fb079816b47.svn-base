@@ -1,0 +1,130 @@
+@extends('modules.project.detail')
+
+@section('additionJs')
+	<script src="../../assets/global/plugins/jquery-easypiechart/jquery.easypiechart.min.js" type="text/javascript"></script>
+	<script src="../../assets/admin/pages/scripts/index.js" type="text/javascript"></script>
+	<link href="{{ URL::asset('/assets/admin/pages/css/tasks.css') }}" rel="stylesheet" type="text/css"/>
+@stop
+
+@section('readyFunction')
+		Index.initMiniCharts();
+@stop
+
+@section('overview')
+<!-- BEGIN PROFILE-->
+	<div class="form-body">
+		<div class="row">
+			<div class="col-md-6">
+				<div class="form-group">
+					<div class="col-md-10">
+						<div class="portlet blue box ">
+							<div class="portlet-title">
+								<div class="caption">
+								<i class="icon-docs"></i>
+									<span class="caption-subject bold">Project Detail</span>
+								</div>
+							</div>
+							<div class="portlet-body">
+								<div class="row">
+									<div class="form-group">
+										<label class=" col-md-10 control-label" style="margin-left:25px;text-align:left">Project Code : {{$data->project_code}}</label>
+									</div>
+									<div class="form-group">
+										<label class="col-md-10 control-label" style="margin-left:25px;text-align:left">Project Name : {{$data->project_name}}</label>
+									</div>
+									<div class="form-group">
+										<label class=" col-md-10 control-label" style="margin-left:25px;text-align:left">Project Category : {{$data->category_name}}</label>
+									</div>
+									<div class="form-group">
+										<label class="col-md-10 control-label" style="margin-left:25px;text-align:left">Sales Person : {{$data->emp_firstname}}</label>
+									</div>
+									<div class="form-group">
+										<label class=" col-md-10 control-label" style="margin-left:25px;text-align:left">Customer : {{$data->customer_name}}</label>
+									</div>
+									<div class="form-group">
+										<label class="col-md-10 control-label" style="margin-left:25px;text-align:left">Status : {{$data->status_desc}}</label>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="form-group">
+					<div class="col-md-10">
+						<div class="portlet blue box ">
+							<div class="portlet-title">
+								<div class="caption">
+								<i class="icon-bar-chart"></i>
+									<span class="caption-subject bold">General Stats</span>
+								</div>
+							</div>
+							<div class="portlet-body">
+								<div class="row">
+									<div class="col-md-5">
+										<div class="easy-pie-chart">
+											<div class="number transactions" data-percent="{{$percentTask->average}}">
+												<span>{{$percentTask->average}}</span>%
+											</div>
+												<a class="title" href="#">
+													Task Completed <i class="icon-arrow-right"></i>
+												</a>
+										</div>
+									</div>
+									<div class="margin-bottom-10 visible-sm">
+									</div>
+									<div class="col-md-7">
+										<div class="easy-pie-chart">
+											<div class="number visits" data-percent="{{$data->percentage}}">
+												<span>{{$data->percentage}}</span>%
+											</div>
+												<a class="title" href="#">
+												Budget ( Plan Vs Actual ) <i class="icon-arrow-right"></i>
+												</a>
+										</div>
+									</div>
+									<div class="margin-bottom-10 visible-sm">
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+			<!--/span-->
+			<div class="col-md-6 ">
+				<div class="portlet box green-haze tasks-widget">
+						<div class="portlet-title">
+							<div class="caption">
+								<i class="fa fa-check"></i>Tasks
+							</div>
+						</div>
+						<div class="portlet-body">
+							<div class="task-content">
+								<div class="scroller" style="height: 305px;" data-always-visible="1" data-rail-visible1="1">
+									<!-- START TASK LIST -->
+									<ul class="task-list">
+										<?php
+											if($task){
+											foreach($task as $val){
+										?>
+										<li>
+											<div class="task-title">
+												<span class="task-title-sp">
+													{{$val->text}}
+												</span>
+											</div>
+										</li>
+										<?php }} ?>
+									</ul>
+									<!-- END START TASK LIST -->
+								</div>
+							</div>
+						</div>
+					</div>
+			</div>
+			<!--/span-->
+		</div>
+		<!--/row-->
+	</div>
+	<!-- END PROFILE-->
+@stop

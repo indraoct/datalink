@@ -1,0 +1,278 @@
+@extends('layouts.admin.default')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+		<link href="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css') }}" rel="stylesheet" type="text/css"/>
+		<link href="{{ URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css') }}" rel="stylesheet" type="text/css"/>
+		<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/scripts/datatable.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+		<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	
+	function construct() {
+
+		/* BEGIN DATA TABLE */
+		var grid = new Datatable();
+
+				grid.init({
+					src: $("#datatable"),
+					onSuccess: function (grid) {
+						// execute some code after table records loaded
+					},
+					onError: function (grid) {
+						// execute some code on network or other general error  
+					},
+					dataTable: { // here you can define a typical datatable settings from http://datatables.net/usage/options 
+						"ajax": {
+							"url": "{{ URL::to('/') }}/inventory/delivery_order/get_data", // ajax source
+						},
+						"order": [
+							[1, "asc"]
+						], // set first column as a default sort by asc
+						"columns": [
+							{ data: 'no', className: "alignCenter" },
+							{ data: 'trx_no' },
+							{ data: 'trx_date' },
+							{ data: 'project_name' },
+							{ data: 'customer_name' },
+							{ data: 'action', bSortable: false, className: "alignCenter" }
+						]
+					}
+				});
+		/* END DATA TABLE */
+	
+		/* BEGIN EVENT HANDLER */
+		
+		// tombol add
+		$(document).on('click', "#add", function(){
+			
+			$('#act').val('add');
+			$('#dialog_title').text('Choose Purchase Order');
+			$('#form').find('.form-control').removeAttr('disabled');
+			$('#modal').modal('show');
+		});
+		
+		// tombol delete
+		$("#datatable tbody").on('click', "a.do_delete", function(){
+					
+			var oTable = grid.getDataTable();
+			saveDelete(oTable.row($(this).parents('tr')).data().id);
+		});
+		
+		// event ketika modal ditampilkan
+		$('#modal').on('show', function(e) {
+			
+			if($('#act').val()=='add')
+				clearForm('#form2');
+			
+		});
+		
+		// tombol save
+		$("#modal").on('click', "#procces", function(){
+			var id = $("#id_po").val();
+			if(id)
+				window.location.href ="{{ URL::to('/') }}/inventory/delivery_order/new/"+id;
+			else
+				toastr['error']('Please Select Po First');
+		});
+		
+		/* END EVENT HANDLER */
+	};
+
+	$('.date-picker').datepicker({
+        rtl: Metronic.isRTL(),
+        orientation: "left",
+        autoclose: true
+    });
+
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+	});
+	
+	function exportData(thisD,xport)
+	{
+		var $form = $('#formExport');
+		var data = $form.find('input[name="export"]').val(xport);
+		$form.submit();
+	}
+	</script>
+@stop
+
+@section('content')
+	<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			{{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Inventory</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">Delivery Order</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<div class="row">
+	<!-- BEGIN PAGE CONTENT-->
+		<div class="col-md-12">
+			<!-- Begin: life time stats -->
+			<div class="portlet">
+				<div class="portlet-title">
+					<div class="caption">
+						<div class="btn-group">
+							<button class="btn btn green filter-submit tooltips" data-original-title="Create New" id="add"><i class="fa fa-plus"></i></button>
+						</div>
+					</div>
+					<div class="actions">
+						<div class="btn-group">
+							<a class="btn default yellow-stripe" href="javascript:;" data-toggle="dropdown" data-hover="dropdown" data-delay="1000" data-close-others="true">
+							<!--<i class="fa fa-print"></i>-->
+							<span class="hidden-480">
+								Export
+							</span>
+							<i class="fa fa-angle-down"></i>
+							</a>
+							<ul class="dropdown-menu pull-right">
+								<li>
+									<a href="javascript:;" onClick = "exportData(this,'csv')">
+										Export CSV
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;" class="print" onClick = "exportData(this,'pdf')">
+										Export PDF
+									</a>
+								</li>
+								<li>
+									<a href="javascript:;" class="print" onClick = "exportData(this,'xls')">
+										Export Excel
+									</a>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			<div class="portlet-body">
+	{{ Form::open(array('id'=> 'formExport','action' => app()->make('router')->currentRouteAction())) }}
+				{{ Form::hidden('export','',array()) }}
+				{{ Form::hidden('report','',array()) }}
+					<div class="table-container">
+						<table class="table table-striped table-bordered table-hover" id="datatable">
+						<thead>
+						<tr role="row" class="heading">
+							<th width="5%">
+								#
+							</th>
+							<th width="25%">
+								Do No
+							</th>
+							<th width="20%">
+								Do Date
+							</th>
+							<th width="20%">
+								Project
+							</th>
+							<th width="20%">
+								Customer
+							</th>
+							<th width="10%">
+								 Actions
+							</th>
+						</tr>
+						<tr role="row" class="filter">
+							<td>
+							</td>
+							<td>
+								<input type="text" class="form-control form-filter input-sm" name="filter[trx_no]">
+							</td>
+                                <td>
+                                    <div class="input-group date date-picker margin-bottom-5" data-date-format="{{ Config::get('format.date.default') }}">
+                                        {{ Form::text('filter[tanggal_dari]','',array('class'=>'form-control form-filter input-sm','placeholder'=>'Dari','readonly'=>true)) }}
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+                                        </span>
+                                    </div>
+                                    <div class="input-group date date-picker" data-date-format="{{ Config::get('format.date.default') }}">
+                                        {{ Form::text('filter[tanggal_hingga]','',array('class'=>'form-control form-filter input-sm','placeholder'=>'Hingga','readonly'=>true)) }}
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+                                        </span>
+                                    </div>
+                                </td>
+							<td>
+								{{ Form::select('filter[id_project]',$listProject,null,array('class'=>'form-control select2 form-filter input-sm')) }}
+							</td>
+							<td>
+								{{ Form::select('filter[id_customer]',$listCustomer,null,array('class'=>'form-control select2 form-filter input-sm')) }}
+							</td>
+							<td>
+								<button class="btn btn-sm yellow filter-submit tooltips" data-original-title="Cari"><i class="fa fa-search"></i> </button>
+								<button class="btn btn-sm red filter-cancel tooltips" data-original-title="Reset"><i class="fa fa-times"></i> </button>
+							</td>
+						</tr>
+						</thead>
+						<tbody>
+						</tbody>
+						</table>
+					</div>
+	{{ Form::close() }}
+				</div>
+			</div>
+			<!-- End: life time stats -->
+		</div>
+	</div>
+	<!-- Begin Dialog Form -->
+	<div id="modal" class="modal fade" tabindex="-1" data-focus-on="input:first" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-hidden="true"></button>
+					<h4 class="modal-title"><span id="dialog_title"></span></h4>
+				</div>
+				<div class="modal-body">
+					<div class="scroller" style="height:70px" data-always-visible="1" data-rail-visible1="1">
+						<form role="form" id="form2" class="form-horizontal" action="#">
+							<div class="form-body">
+								<div class="form-group">
+									<label class="col-md-3 control-label">BOM No <font color="red"><strong> * </strong></font></label>
+									<div class="col-md-5">
+										{{ Form::hidden('act','',array('id'=>'act')) }}
+										{{ Form::select('id_bom',$listBOM,'',array('id'=>'id_po','class'=>'form-control')) }}
+									</div>
+								</div>
+							</div>
+						</form>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" id="procces" class="btn blue">Process</button>
+					<button type="button" data-dismiss="modal" class="btn default">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Dialog Form -->
+	
+	<!-- END PAGE CONTENT-->
+@stop

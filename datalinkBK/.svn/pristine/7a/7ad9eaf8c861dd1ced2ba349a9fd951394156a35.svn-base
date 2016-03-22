@@ -1,0 +1,163 @@
+<?php
+
+class PurchaseRequestController extends BaseController {
+
+    protected $_defaultModel = 'PurchaseRequestModel';
+    protected $_pageTitle = 'Purchase Request';
+    protected $_menuId = 'purchase_request';
+
+    public function __construct() {
+        
+    }
+
+    public function index() {
+        if(Session::get('action')!='back')
+            Session::forget('pos');
+        
+        Session::forget('action'); 
+        $param = array(
+            'title'     => $this->_pageTitle,
+            'menu_id'   => $this->_menuId,
+            'title_desc' => 'Purchase',
+            'listBom'   => GeneralModel::customGetSelectionList('t_project_bom', 'bom_no', 'bom_no', 'BOM-'),
+            'new'       => hasPrivilege($this->_menuId, 'new'),
+            'back_data' => Session::get('pos')
+        );
+        return View::make('modules.purchase_request.index', $param);
+    }
+
+    public function getData() {
+        if (Request::ajax()) {
+
+            $privi['edit'] = hasPrivilege($this->_menuId, 'edit');
+            $privi['delete'] = hasPrivilege($this->_menuId, 'delete');
+
+            $param = Input::all();
+
+            $iDisplayLength = intval($param['length']);
+            $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength;
+            $offset = intval($param['start']);
+            $draw = intval($param['draw']);
+            $sortBy = $param['order'][0]['column'];
+            $sortDir = $param['order'][0]['dir'];
+            $filter = isset($param['filter']) ? $param['filter'] : array();
+
+            $model = new $this->_defaultModel;
+            $get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+
+            $data = array();
+            $n = $offset + 1;
+            foreach ($get['data'] as $key => $r) {
+                $row = $r;
+
+                $row->id = $r->$get['id'];
+                unset($row->$get['id']);
+
+                $ubah = $hapus = '';
+                if ($privi['edit'])
+                    $ubah = '<a href="' . URL::to('/') . '/request/detail/' . encode($row->id) . '" class="btn btn-xs purple tooltips show_edit" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+                if ($privi['delete'])
+                    $hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+
+                $row->action = '<div>' . $ubah . $hapus . '</div>';
+                $row->no = $n;
+                
+                $row->pr_nums = 'PR-'.$row->pr_no;
+
+                $data[$key] = $row;
+
+                $n++;
+            }
+
+            $records["data"] = $get['data'];
+            $records["draw"] = $draw;
+            $records["recordsTotal"] = $get['count'];
+            $records["recordsFiltered"] = $get['filter_count'];
+            
+
+            echo json_encode($records);
+        }
+    }
+
+    public function add() {
+        $lPurpose = array(1 => 'Minimum Stock', 2 => 'Project');
+        $get_bom = Input::get('bom');
+        $p = GeneralModel::getTable('t_project_bom', array('bom_no' => "= $get_bom"))->first();
+        $p_id = GeneralModel::getTable('m_project', array('id_project' => "= $p->id_project"))->first();
+        $model = $this->_defaultModel;
+        if(Input::get('purpose') == 1){
+            $project_name = '';
+            $bom = '';
+        }else{
+            $project_name = "$p_id->project_name";
+            $bom = "BOM-$get_bom";
+        }
+        
+        $param = array(
+            'title' => 'New Purchase Request',
+            'title_desc' => 'Purchase',
+            'menu_id' => $this->_menuId,
+            'lpurpose' => $lPurpose,
+            'purpose' => Input::get('purpose'),
+            'pr_no' => 'PR-'.GeneralModel::getPRNo(),
+            'pr_tgl' => date("d-m-Y"),
+            'requestor' => '',
+            'project_name' => "$project_name",
+            'bom' => "$bom",
+        );
+        return View::make('modules.purchase_request.add1', $param);
+    }
+    
+    public function getDataSelect() {
+
+            $term = Input::get('term');
+            $model = $this->_defaultModel;
+
+            $query = DB::table('m_item')
+                ->where('item_code', 'LIKE', '%' . $term . '%')
+                ->orWhere('item_name', 'LIKE', '%' . $term . '%');
+
+            $get['data'] = $query->orderBy('item_name')->take(100)->get();
+
+            $data = array();
+
+            foreach ($get['data'] as $key => $r) {
+                $row = $r;
+                $data[] = $row;
+            }
+
+            echo json_encode($data);
+    }
+
+    public function getRow(){
+        if (Request::ajax()) {
+
+            $id = intval(Input::get('id'));
+
+            $model = new $this->_defaultModel;
+            $data = $model->getRow($id);
+
+            echo json_encode($data);
+        }
+    }
+    
+    public function rules($type) {
+        $rules = array(
+            'project_code' => 'required|alpha_num|unique:m_project',
+            'project_name' => 'required',
+            'id_category' => 'required',
+            'id_customer' => 'required',
+            'id_sales_person' => 'required',
+            'id_area' => 'required',
+        );
+        if ($type == 'edit') {
+            unset($rules['project_code']);
+        }
+        return $rules;
+    }
+
+    
+
+    
+
+}

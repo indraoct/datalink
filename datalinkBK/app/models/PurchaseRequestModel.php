@@ -1,0 +1,158 @@
+<?php
+
+class PurchaseRequestModel {
+
+    protected $_table = 't_purchase_request';
+    protected $_id = 'id_pr';
+
+    public function getData($filter, $limit = null, $offset = null, $sortBy = null, $sortDir = null) {
+        $data['id'] = $this->_id;
+
+        $tableColumn = array($this->_id, 'a.pr_no', 'a.pr_date', 'a.requestor', 'a.notes');
+        $query = DB::table($this->_table . ' AS a')
+                ->where('a.is_deleted', 0);
+
+        $data['count'] = $data['filter_count'] = $query->count();
+
+        if ($filter) {
+            if (isset($filter['pr_no']))
+                $query->where('a.pr_no', 'LIKE', '%' . $filter['pr_no'] . '%');
+            if ($filter['tanggal_dari'])
+                $query->where('a.pr_date', '>=', defaultDate($filter['tanggal_dari']));
+            if ($filter['tanggal_hingga'])
+                $query->where('a.pr_date', '<=', defaultDate($filter['tanggal_hingga']));
+            if (isset($filter['requestor']))
+                $query->where('a.requestor', 'LIKE', '%' . $filter['requestor'] . '%');
+            if (isset($filter['notes']))
+                $query->where('a.notes', 'LIKE', '%' . $filter['notes'] . '%');
+
+
+            $data['filter_count'] = $query->count();
+        }
+
+        if ($limit) {
+            $query->orderBy($tableColumn[$sortBy], $sortDir)->skip($offset)->take($limit);
+        }
+
+        $data['data'] = $query->get();
+
+        return $data;
+    }
+
+    public function getDataSelect($term) {
+        $query = DB::table('m_item')
+                ->where('item_code', 'LIKE', '%' . $term . '%')
+                ->orWhere('item_name', 'LIKE', '%' . $term . '%');
+
+        $data = $query->orderBy('item_name')->take(100)->get();
+
+        return $data;
+    }
+
+    public function insertData($data) {
+        try {
+            DB::beginTransaction();
+            $insert = array(
+                'owner' => Crypt::decrypt(Session::get('owner')),
+                'project_code' => $data['project_code'],
+                'id_category' => $data['id_category'],
+                'id_customer' => $data['id_customer'],
+                'id_sales_person' => $data['id_sales_person'],
+                'id_area' => $data['id_area'],
+                'project_name' => $data['project_name'],
+                'description' => $data['description'],
+                'status' => 1, //pre sales
+                'is_deleted' => 0,
+                'created_by' => Session::get('user_name'),
+                'created_at' => DB::raw('now()')
+            );
+
+            $id = DB::table($this->_table)->insertGetId($insert);
+            DB::commit();
+        } catch (Exception $e) {
+            DB::rollback();
+            return $e->getMessage();
+        }
+        return true;
+    }
+
+    public function deleteData($id) {
+        $updateArr = array(
+            'is_deleted' => 1,
+            'updated_by' => Session::get('user_name'),
+            'updated_at' => DB::raw('now()'),
+            'deleted_at' => DB::raw('now()')
+        );
+
+        return DB::table($this->_table)
+                        ->where($this->_id, $id)
+                        ->update($updateArr);
+    }
+
+    public function getDetail($id) {
+        $query = DB::table($this->_table)
+                ->select('*')
+                ->where('is_deleted', 0)
+                ->where('id_project', $id)
+                ->where('owner', Crypt::decrypt(Session::get('owner')));
+
+        $data = $query->first();
+
+        return $data;
+    }
+
+    public function updateData($data) {
+        if (empty($data['id']))
+            return 'Data Not Found';
+        try {
+            DB::beginTransaction();
+            $update = array(
+                'id_category' => $data['id_category'],
+                'id_customer' => $data['id_customer'],
+                'id_sales_person' => $data['id_sales_person'],
+                'id_area' => $data['id_area'],
+                'project_name' => $data['project_name'],
+                'description' => $data['description'],
+                'updated_by' => Session::get('user_name'),
+                'updated_at' => DB::raw('now()')
+            );
+
+            DB::table($this->_table)->where($this->_id, $data['id'])->update($update);
+
+            DB::commit();
+        } catch (Exception $e) {
+            DB::rollback();
+            return $e->getMessage();
+        }
+        return true;
+    }
+
+    public function projectStatus($id) {
+        $data = DB::table('m_project')
+                ->select('id_project')
+                ->where($this->_id, $id)
+                ->where('owner', Crypt::decrypt(Session::get('owner')))
+                ->where('is_deleted', 0)
+                ->where('status', '>', 1)
+                ->get();
+
+        return $data;
+    }
+
+    public function getTaskPercentage($id) {
+        $data = DB::table('t_project_timeline_tasks')
+                ->select(DB::raw('TRUNCATE(avg(progress)*100,2) AS average'))
+                ->where($this->_id, $id)
+                ->where('owner', Crypt::decrypt(Session::get('owner')))
+                ->first();
+        return $data;
+    }
+    
+    public function getPRNoByID($id) {
+        $query = DB::table($this->_table)
+                ->select(DB::raw('pr_no'))
+                ->where($this->_id, $id);
+        return $query->first()->pr_no;
+    }
+
+}

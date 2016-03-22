@@ -1,0 +1,47 @@
+<?php
+
+class StockOpnameModel{
+    
+    protected $_table = 't_stock_opname';
+    protected $_id = 'id_trx';
+    
+    protected $_table_detail = 't_stock_opname_detail';
+    protected $_id_detail = 'id_detail';
+
+
+
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_id, 'trx_no','trx_date','note');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_id, 'trx_no','trx_date','note'))
+                                                        ->where('is_deleted',0)
+                                                        ->where('owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['item_code'] != "")
+				$query->where('b.item_code', 'LIKE', '%'.$filter['item_code'].'%');
+                        if($filter['item_name'] != "")
+				$query->where('b.item_name', 'LIKE', '%'.$filter['item_name'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',$filter['date_from']);
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',$filter['date_to']);
+                       
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+}

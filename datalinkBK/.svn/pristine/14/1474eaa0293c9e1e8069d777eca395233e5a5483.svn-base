@@ -1,0 +1,637 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Application Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register all of the routes for an application.
+| It's a breeze. Simply tell Laravel the URIs it should respond to
+| and give it the Closure to execute when that URI is requested.
+|
+*/
+Route::pattern('id', '[0-9]+');
+
+Route::get('/', function()
+{
+	if (Auth::check())
+		return Redirect::route('home');
+	else
+		return Redirect::route('login');
+});
+
+Route::group(array('prefix'=>'login','as'=>'login','before'=>'guest'),function()
+{
+    Route::get('/',function()
+	{
+        Session::put('page', 'login');
+		$param = array(
+							'title'			=> 'Login',
+							'menu_id'		=> 'login',
+							'body_class'	=> 'login'
+						);
+        return View::make('modules.login',$param);
+    });
+
+    Route::post('/', array('uses' => 'AuthController@doLogin'));
+});
+
+Route::get('missing', array('as' => 'missing', function () 
+{ 
+	$param = array(
+						'title'			=> 'Page 404',
+						'menu_id'		=> 'missing',
+						'body_class'	=> 'page-404-full-page'
+					);
+	if (Auth::check())
+	{
+		return Response::view('errors.missing_admin', $param, 404);
+	}
+	else
+	{ 
+		return Response::view('errors.missing', $param, 404);
+	}
+}));
+
+Route::get('forbidden', array('as' => 'forbidden', function () 
+{ 
+	$param = array(
+						'title'			=> 'Not Allowed',
+						'menu_id'		=> 'forbidden',
+						'body_class'	=> 'page-404-full-page'
+					);
+	return Response::view('errors.forbidden', $param);
+}));
+
+// menu that could be accessed after login
+Route::group(array('before' => 'auth'), function()
+{
+	Route::get('home', array('as' => 'home', function()
+	{
+		$param = array(
+							'title'			=> 'Home',
+							'menu_id'		=> 'home',
+						);
+		return View::make('modules.home.index',$param);
+	}));
+
+	Route::get('logout', array('as' => 'logout', function () 
+	{ 
+		Session::flush(); // clear the session
+		Auth::logout();
+		return Redirect::to('/');
+	}));
+
+	Route::group(array('prefix'=>'customer_category','as'=>'customer_category'),function()
+	{
+		Route::get('/',array('before'=>'privilege:customer_category,view','uses'=>'CustomerCategoryController@index'));
+		Route::post('/get_data',array('before'=>'privilege:customer_category,view','uses'=>'CustomerCategoryController@getData'));
+		Route::post('/add',array('before'=>'privilege:customer_category,new','uses'=>'CustomerCategoryController@doAdd'));
+		Route::post('/delete',array('before'=>'privilege:customer_category,delete','uses'=>'CustomerCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'customer','as'=>'customer'),function()
+	{
+		Route::get('/',array('before'=>'privilege:customer,view','uses'=>'CustomerController@index'));
+		Route::post('/get_data',array('before'=>'privilege:customer,view','uses'=>'CustomerController@getData'));
+		Route::get('/add',array('before'=>'privilege:customer,new','uses'=>'CustomerController@add'));
+		Route::post('/New',array('before'=>'privilege:customer,new','uses'=>'CustomerController@doAdd'));
+		Route::get('/edit/{id_produk}',array('before'=>'privilege:customer,edit','uses'=>'CustomerController@edit'));
+		Route::post('/Edit',array('before'=>'privilege:customer,edit','uses'=>'CustomerController@doEdit'));
+		Route::post('/delete',array('before'=>'privilege:customer,delete','uses'=>'CustomerController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'CustomerController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'project_category','as'=>'product_category'),function()
+	{
+		Route::get('/',array('before'=>'privilege:project_category,view','uses'=>'ProjectCategoryController@index'));
+		Route::post('/get_data',array('before'=>'privilege:project_category,view','uses'=>'ProjectCategoryController@getData'));
+		Route::post('/add',array('before'=>'privilege:project_category,new','uses'=>'ProjectCategoryController@doAdd'));
+		Route::post('/delete',array('before'=>'privilege:project_category,delete','uses'=>'ProjectCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'project','as'=>'project'),function()
+	{
+		Route::get('/',array('before'=>'privilege:project,view','uses'=>'ProjectController@index'));
+		Route::post('/get_data',array('before'=>'privilege:project,view','uses'=>'ProjectController@getData'));
+		Route::get('/add',array('before'=>'privilege:project,new','uses'=>'ProjectController@Add'));
+		Route::post('/New',array('before'=>'privilege:project,new','uses'=>'ProjectController@doAdd'));
+		Route::get('/edit/{id_produk}',array('before'=>'privilege:project,edit','uses'=>'ProjectController@edit'));
+		Route::post('/Edit',array('before'=>'privilege:project,edit','uses'=>'ProjectController@doEdit'));
+		Route::post('/delete',array('before'=>'privilege:project,delete','uses'=>'ProjectController@doDelete'));
+		
+		Route::get('/overview/{id_project}',array('before'=>'privilege:project,view','uses'=>'ProjectController@showOverview'));
+		
+		Route::get('/timeline/{id_project}',array('before'=>'privilege:project_timeline,view','uses'=>'ProjectTimelineController@index'));
+		Route::any('/timeline/save',array('before'=>'privilege:project_timeline,edit','uses'=>'ProjectTimelineController@save'));
+		Route::any('/timeline/load/{id}',array('before'=>'privilege:project_timeline,view','uses'=>'ProjectTimelineController@load'));
+		
+		Route::get('/quotation/{id_project}',array('before'=>'privilege:project_quotation,view','uses'=>'ProjectQTController@index'));
+		Route::get('/sales/{id_project}',array('before'=>'privilege:project_sales,view','uses'=>'ProjectSalesController@index'));
+		Route::get('/bom/{id_project}',array('before'=>'privilege:project_bom,view','uses'=>'ProjectBoMController@index'));
+		Route::get('/attachment/{id_project}',array('before'=>'privilege:project,view','uses'=>'ProjectAttachmentController@index'));
+		
+		Route::post('/get_row', array('uses' => 'ProjectController@getRow'));
+	});
+	
+	Route::group(array('prefix'=>'open_project','as'=>'open_project'),function()
+	{
+		Route::get('/',array('before'=>'privilege:open_project,view','uses'=>'OpenProjectController@index'));
+		Route::post('/get_data',array('before'=>'privilege:open_project,view','uses'=>'OpenProjectController@getData'));
+	});
+
+	Route::group(array('prefix'=>'sales','as'=>'sales'),function()
+	{			
+		/* Modul Invoice & Tax */
+		Route::get('/invoice',array('before'=>'privilege:sales,view','uses'=>'SalesInvoiceController@index'));
+		Route::get('/invoice/detail/{id_trx}',array('before'=>'privilege:sales,view','uses'=>'SalesInvoiceController@showDetail'));
+		Route::post('/invoice/get_data',array('before'=>'privilege:sales,view','uses'=>'SalesInvoiceController@getData'));
+		Route::post('/invoice/cancel',array('before'=>'privilege:sales,delete','uses'=>'SalesInvoiceController@doCancel'));
+		
+		Route::get('/invoice/get_select_list', array('uses' => 'SalesInvoiceController@getDataSelect'));
+		Route::post('/invoice/get_row', array('uses' => 'SalesInvoiceController@getRow'));
+		
+		// new
+		Route::get('/invoice/new/',array('before'=>'privilege:sales,new','uses'=>'SalesInvoiceNewController@index'));
+		
+		Route::post('/invoice/new', array('before'=>'privilege:sales,new','uses' => 'SalesInvoiceNewController@doProcess'));
+		Route::post('/invoice/new/save', array('before'=>'privilege:sales,new','uses' => 'SalesInvoiceNewController@doSave'));
+		Route::post('/invoice/new/validate', array('uses' => 'SalesInvoiceNewController@doValidate'));
+		// Route::post('/invoice/process_draft', array('uses' => 'SalesInvoiceNewController@index'));
+		
+		/* End Invoice & Tax */
+	});
+
+	Route::group(array('prefix'=>'vendor_category','as'=>'vendor_category'),function()
+	{
+		Route::get('/',array('before'=>'privilege:vendor_category,view','uses'=>'VendorCategoryController@index'));
+		Route::post('/get_data',array('before'=>'privilege:vendor_category,view','uses'=>'VendorCategoryController@getData'));
+		Route::post('/add',array('before'=>'privilege:vendor_category,new','uses'=>'VendorCategoryController@doAdd'));
+		Route::post('/delete',array('before'=>'privilege:vendor_category,delete','uses'=>'VendorCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'vendor2','as'=>'vendor'),function()
+	{
+		Route::get('/',array('before'=>'privilege:vendor,view','uses'=>'VendorController@index'));
+		Route::post('/get_data',array('before'=>'privilege:vendor,view','uses'=>'VendorController@getData'));
+		Route::get('/add',array('before'=>'privilege:vendor,new','uses'=>'VendorController@Add'));
+		Route::post('/New',array('before'=>'privilege:vendor,new','uses'=>'VendorController@doAdd'));
+		Route::get('/edit/{id_produk}',array('before'=>'privilege:vendor,edit','uses'=>'VendorController@Edit'));
+		Route::post('/Edit',array('before'=>'privilege:vendor,edit','uses'=>'VendorController@doEdit'));
+		Route::post('/delete',array('before'=>'privilege:vendor,delete','uses'=>'VendorController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'VendorController@getRow'));
+	});
+	
+	Route::group(array('prefix'=>'purchase','as'=>'purchase'),function()
+	{		
+		/* Modul Request */
+		Route::get('/request',array('before'=>'privilege:purchase_request,view','uses'=>'PurchaseRequestController@index'));
+		Route::get('/request/detail/{id_trx}',array('before'=>'privilege:purchase_request,view','uses'=>'PurchaseRequestController@showDetail'));
+		Route::post('/request/get_data',array('before'=>'privilege:purchase_request,view','uses'=>'PurchaseRequestController@getData'));
+		Route::post('/request/cancel',array('before'=>'privilege:purchase_request,delete','uses'=>'PurchaseRequestController@doCancel'));
+		
+		Route::get('/request/get_select_list', array('uses' => 'PurchaseRequestController@getDataSelect'));
+		Route::post('/request/get_row', array('uses' => 'PurchaseRequestController@getRow'));
+		
+		// new
+		Route::get('/request/new/',array('before'=>'privilege:purchase_request,new','uses'=>'PurchaseRequestNewController@index'));
+		
+		Route::post('/request/new', array('before'=>'privilege:purchase_request,new','uses' => 'PurchaseRequestNewController@doProcess'));
+		Route::post('/request/new/save', array('before'=>'privilege:purchase_request,new','uses' => 'PurchaseRequestNewController@doSave'));
+		Route::post('/request/new/validate', array('uses' => 'PurchaseRequestNewController@doValidate'));
+		
+		/* End Request  */
+		
+		/* Modul Order */
+		Route::get('/order',array('before'=>'privilege:purchase_order,view','uses'=>'PurchaseOrderController@index'));
+		Route::get('/order/detail/{id_trx}',array('before'=>'privilege:purchase_order,view','uses'=>'PurchaseOrderController@showDetail'));
+		Route::post('/order/get_data',array('before'=>'privilege:purchase_order,view','uses'=>'PurchaseOrderController@getData'));
+		Route::post('/order/cancel',array('before'=>'privilege:purchase_order,delete','uses'=>'PurchaseOrderController@doCancel'));
+		
+		Route::get('/order/get_select_list', array('uses' => 'PurchaseOrderController@getDataSelect'));
+		Route::post('/order/get_row', array('uses' => 'PurchaseOrderController@getRow'));
+		
+		// new
+		Route::get('/order/new/',array('before'=>'privilege:purchase_order,new','uses'=>'PurchaseOrderNewController@index'));
+		
+		Route::post('/order/new', array('before'=>'privilege:purchase_order,new','uses' => 'PurchaseOrderNewController@doProcess'));
+		Route::post('/order/new/save', array('before'=>'privilege:purchase_order,new','uses' => 'PurchaseOrderNewController@doSave'));
+		Route::post('/order/new/validate', array('uses' => 'PurchaseOrderNewController@doValidate'));
+		
+		/* End Order */
+		
+		/* Modul Invoice */
+		Route::get('/invoice',array('before'=>'privilege:purchase_invoice,view','uses'=>'PurchaseInvoiceController@index'));
+		Route::get('/invoice/detail/{id_trx}',array('before'=>'privilege:purchase_invoice,view','uses'=>'PurchaseInvoiceController@showDetail'));
+		Route::post('/invoice/get_data',array('before'=>'privilege:purchase_invoice,view','uses'=>'PurchaseInvoiceController@getData'));
+		Route::post('/invoice/cancel',array('before'=>'privilege:purchase_invoice,delete','uses'=>'PurchaseInvoiceController@doCancel'));
+		
+		Route::get('/invoice/get_select_list', array('uses' => 'PurchaseInvoiceController@getDataSelect'));
+		Route::post('/invoice/get_row', array('uses' => 'PurchaseInvoiceController@getRow'));
+		
+		// new
+		Route::get('/invoice/new/',array('before'=>'privilege:purchase_invoice,new','uses'=>'PurchaseInvoiceNewController@index'));
+		
+		Route::post('/invoice/new', array('before'=>'privilege:purchase_invoice,new','uses' => 'PurchaseInvoiceNewController@doProcess'));
+		Route::post('/invoice/new/save', array('before'=>'privilege:purchase_invoice,new','uses' => 'PurchaseInvoiceNewController@doSave'));
+		Route::post('/invoice/new/validate', array('uses' => 'PurchaseInvoiceNewController@doValidate'));
+		
+		/* End Invoice  */
+	});
+
+	Route::group(array('prefix'=>'warehouse','as'=>'warehouse'),function()
+	{
+		Route::get('/',array('before'=>'privilege:warehouse,view','uses'=>'WarehouseController@index'));
+		Route::post('/get_data',array('before'=>'privilege:warehouse,view','uses'=>'WarehouseController@getData'));
+		Route::get('/add',array('before'=>'privilege:warehouse,new','uses'=>'WarehouseController@Add'));
+        Route::post('/New',array('before'=>'privilege:warehouse,new','uses'=>'WarehouseController@doAdd'));
+		Route::get('/edit/{id_warehouse}',array('before'=>'privilege:warehouse,edit','uses'=>'WarehouseController@edit'));
+		Route::post('/Edit',array('before'=>'privilege:warehouse,edit','uses'=>'WarehouseController@doEdit'));
+		Route::post('/delete',array('before'=>'privilege:warehouse,delete','uses'=>'WarehouseController@doDelete'));
+		Route::post('/get_row', array('uses' => 'WarehouseController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'item_category','as'=>'item_category'),function()
+	{
+		Route::get('/',array('before'=>'privilege:item_category,view','uses'=>'ItemCategoryController@index'));
+		Route::post('/get_data',array('before'=>'privilege:item_category,view','uses'=>'ItemCategoryController@getData'));
+		Route::post('/add',array('before'=>'privilege:item_category,new','uses'=>'ItemCategoryController@doAdd'));
+		Route::post('/delete',array('before'=>'privilege:item_category,delete','uses'=>'ItemCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'item_brand','as'=>'item_brand'),function()
+	{
+		Route::get('/',array('before'=>'privilege:item_brand,view','uses'=>'ItemBrandController@index'));
+		Route::post('/get_data',array('before'=>'privilege:item_brand,view','uses'=>'ItemBrandController@getData'));
+		Route::post('/add',array('before'=>'privilege:item_brand,new','uses'=>'ItemBrandController@doAdd'));
+		Route::post('/delete',array('before'=>'privilege:item_brand,delete','uses'=>'ItemBrandController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'item','as'=>'item'),function()
+	{
+		Route::get('/',array('before'=>'privilege:item,view','uses'=>'ItemController@index'));
+		Route::post('/get_data',array('before'=>'privilege:item,view','uses'=>'ItemController@getData'));
+                Route::post('/get_data_stock',array('before'=>'privilege:item,view','uses'=>'ItemController@getDataStock'));
+                Route::post('/get_data_tambahan',array('before'=>'privilege:item,view','uses'=>'ItemController@getDataTambahan'));
+		Route::get('/add',array('before'=>'privilege:item,new','uses'=>'ItemController@Add'));
+                Route::post('/New',array('before'=>'privilege:item,new','uses'=>'ItemController@doAdd'));
+		Route::get('/edit/{id_item}',array('before'=>'privilege:item,edit','uses'=>'ItemController@edit'));
+                Route::get('/detail/{id_item}',array('before'=>'privilege:item,view','uses'=>'ItemController@edit'));
+                Route::post('/Edit',array('before'=>'privilege:item,edit','uses'=>'ItemController@doEdit'));
+		Route::post('/delete',array('before'=>'privilege:item,delete','uses'=>'ItemController@doDelete'));
+                Route::post('/addUnit',array('before'=>'privilege:item,new','uses'=>'ItemController@doAddUnit'));
+                Route::post('/validate',array('before'=>'privilege:item,new','uses'=>'ItemController@doValidate'));
+                
+		Route::post('/get_row', array('uses' => 'ItemController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'inventory','as'=>'inventory'),function()
+	{
+		/* Modul Data */
+		Route::get('/data',array('before'=>'privilege:view_stock,view','uses'=>'InventoryController@index'));
+		Route::post('/data/get_data',array('before'=>'privilege:view_stock,view','uses'=>'InventoryController@getData'));
+		Route::get('/data/card/{id_produk}',array('before'=>'privilege:view_stock,view','uses'=>'InventoryController@showInventoryCard'));
+		Route::post('/data/card/get_stock_card',array('before'=>'privilege:view_stock,view','uses'=>'InventoryController@getDataInventoryCard'));
+		Route::post('/data/get_data_tambahan',array('before'=>'privilege:item,view','uses'=>'InventoryController@getDataTambahan'));
+		Route::get('/get_select_list', array('uses' => 'InventoryController@getDataSelect'));
+		Route::post('/get_row', array('uses' => 'InventoryController@getRow'));
+		/* Modul Data  */
+		
+		/* Modul Opname */
+		Route::get('/opname',array('before'=>'privilege:stock_opname,view','uses'=>'StockOpnameController@index'));
+		Route::get('/opname/detail/{id_trx}',array('before'=>'privilege:stock_opname,view','uses'=>'StockOpnameController@showDetail'));
+		Route::post('/opname/get_data',array('before'=>'privilege:stock_opname,view','uses'=>'StockOpnameController@getData'));
+		Route::post('/opname/cancel',array('before'=>'privilege:stock_opname,delete','uses'=>'StockOpnameController@doCancel'));
+		
+		Route::get('/opname/get_select_list', array('uses' => 'StockOpnameController@getDataSelect'));
+		Route::post('/opname/get_row', array('uses' => 'StockOpnameController@getRow'));
+		
+		// new
+		Route::get('/opname/new/',array('before'=>'privilege:stock_opname,new','uses'=>'StockOpnameNewController@index'));
+		
+		Route::post('/opname/new', array('before'=>'privilege:stock_opname,new','uses' => 'StockOpnameNewController@doProcess'));
+		Route::post('/opname/new/save', array('before'=>'privilege:stock_opname,new','uses' => 'StockOpnameNewController@doSave'));
+		Route::post('/opname/new/validate', array('uses' => 'StockOpnameNewController@doValidate'));
+		
+		/* End Opname */
+		
+		/* Modul Transfer */
+		Route::get('/transfer',array('before'=>'privilege:stock_transfer,view','uses'=>'StockTransferController@index'));
+		Route::get('/transfer/detail/{id_trx}',array('before'=>'privilege:stock_transfer,view','uses'=>'StockTransferController@showDetail'));
+		Route::post('/transfer/get_data',array('before'=>'privilege:stock_transfer,view','uses'=>'StockTransferController@getData'));
+		Route::post('/transfer/cancel',array('before'=>'privilege:stock_transfer,delete','uses'=>'StockTransferController@doCancel'));
+		
+		Route::get('/transfer/get_select_list', array('uses' => 'StockTransferController@getDataSelect'));
+		Route::post('/transfer/get_row', array('uses' => 'StockTransferController@getRow'));
+		
+		// new
+		Route::get('/transfer/new/',array('before'=>'privilege:stock_transfer,new','uses'=>'StockTransferNewController@index'));
+		
+		Route::post('/transfer/new', array('before'=>'privilege:stock_transfer,new','uses' => 'StockTransferNewController@doProcess'));
+		Route::post('/transfer/new/save', array('before'=>'privilege:stock_transfer,new','uses' => 'StockTransferNewController@doSave'));
+		Route::post('/transfer/new/validate', array('uses' => 'StockTransferNewController@doValidate'));
+		
+		/* End Transfer */
+		
+		/* Modul Good Receipt */
+		Route::get('/good_receipt',array('before'=>'privilege:good_receipt,view','uses'=>'GoodReceiptController@index'));
+		Route::get('/good_receipt/detail/{id_trx}',array('before'=>'privilege:good_receipt,view','uses'=>'GoodReceiptController@showDetail'));
+		Route::post('/good_receipt/get_data',array('before'=>'privilege:good_receipt,view','uses'=>'GoodReceiptController@getData'));
+		Route::post('/good_receipt/cancel',array('before'=>'privilege:good_receipt,delete','uses'=>'GoodReceiptController@doCancel'));
+		
+		Route::get('/good_receipt/get_select_list', array('uses' => 'GoodReceiptController@getDataSelect'));
+		Route::post('/good_receipt/get_row', array('uses' => 'GoodReceiptController@getRow'));
+		
+		// new
+		
+		Route::get('/good_receipt/new/',array('before'=>'privilege:good_receipt,new','uses'=>'GoodReceiptNewController@index'));
+		
+		Route::post('/good_receipt/new', array('before'=>'privilege:good_receipt,new','uses' => 'GoodReceiptNewController@doProcess'));
+		Route::post('/good_receipt/new/save', array('before'=>'privilege:good_receipt,new','uses' => 'GoodReceiptNewController@doSave'));
+		Route::post('/good_receipt/new/validate', array('uses' => 'GoodReceiptNewController@doValidate'));
+		
+		/* End Good Receipt */
+		
+		/* Modul Order */
+		Route::get('/delivery_order',array('before'=>'privilege:delivery_order,view','uses'=>'DeliveryOrderController@index'));
+		Route::get('/delivery_order/detail/{id_trx}',array('before'=>'privilege:delivery_order,view','uses'=>'DeliveryOrderController@showDetail'));
+		Route::post('/delivery_order/get_data',array('before'=>'privilege:delivery_order,view','uses'=>'DeliveryOrderController@getData'));
+		Route::post('/delivery_order/cancel',array('before'=>'privilege:delivery_order,delete','uses'=>'DeliveryOrderController@doCancel'));
+		
+		Route::get('/delivery_order/get_select_list', array('uses' => 'DeliveryOrderController@getDataSelect'));
+		Route::post('/delivery_order/get_row', array('uses' => 'DeliveryOrderController@getRow'));
+		
+		// new
+		Route::get('/delivery_order/new/',array('before'=>'privilege:delivery_order,new','uses'=>'DeliveryOrderNewController@index'));
+		
+		Route::post('/delivery_order/new', array('before'=>'privilege:delivery_order,new','uses' => 'DeliveryOrderNewController@doProcess'));
+		Route::post('/delivery_order/new/save', array('before'=>'privilege:delivery_order,new','uses' => 'DeliveryOrderNewController@doSave'));
+		Route::post('/delivery_order/new/validate', array('uses' => 'DeliveryOrderNewController@doValidate'));
+		
+		/* End Order */
+		
+		/* Modul Report */
+		// Route::get('/report',array('uses'=>'StockOpnameController@index'));
+		// Route::post('/report/get_data',array('uses'=>'StockOpnameController@getData'));
+		/* Modul Report */
+	});
+
+	Route::group(array('prefix'=>'request','as'=>'request'),function()
+	{
+		/* Modul Request Advance */
+		Route::get('/advance',array('before'=>'privilege:request_advance,new','uses'=>'RequestAdvanceController@index'));
+
+		Route::post('/advance', array('before'=>'privilege:request_advance,new','uses' => 'RequestAdvanceController@doProcess'));
+		Route::post('/advance/save', array('before'=>'privilege:request_advance,new','uses' => 'RequestAdvanceController@doSave'));
+		Route::post('/advance/validate', array('uses' => 'RequestAdvanceController@doValidate'));
+		/* End Modul Request Advance */
+		
+		/* Modul Request Expense */
+		Route::get('/expense',array('before'=>'privilege:request_expense,new','uses'=>'RequestExpenseController@index'));
+
+		Route::post('/expense', array('before'=>'privilege:request_expense,new','uses' => 'RequestExpenseController@doProcess'));
+		Route::post('/expense/save', array('before'=>'privilege:request_expense,new','uses' => 'RequestExpenseController@doSave'));
+		Route::post('/expense/validate', array('uses' => 'RequestExpenseController@doValidate'));
+		/* End Modul Request Expense */
+		
+		/* Modul Request Overtime */
+		Route::get('/overtime',array('before'=>'privilege:request_overtime,new','uses'=>'RequestOvertimeController@index'));
+
+		Route::post('/overtime', array('before'=>'privilege:request_overtime,new','uses' => 'RequestOvertimeController@doProcess'));
+		Route::post('/overtime/save', array('before'=>'privilege:request_overtime,new','uses' => 'RequestOvertimeController@doSave'));
+		Route::post('/overtime/validate', array('uses' => 'RequestOvertimeController@doValidate'));
+		/* End Modul Request Overtime */
+		
+		/* Modul Waiting Approval */
+		Route::get('/waiting_approval',array('before'=>'privilege:request_approval,view','uses'=>'RequestApprovalController@index'));
+		Route::get('/waiting_approval/detail/{id_req}',array('before'=>'privilege:request_approval,view','uses'=>'RequestApprovalController@showDetail'));
+		Route::post('/waiting_approval/get_data',array('before'=>'privilege:request_approval,view','uses'=>'RequestApprovalController@getData'));
+		Route::post('/waiting_approval/cancel',array('before'=>'privilege:request_approval,delete','uses'=>'RequestApprovalController@doCancel'));
+		
+		Route::post('/waiting_approval/save', array('before'=>'privilege:request_approval,new','uses' => 'RequestApprovalController@doSave'));
+		Route::post('/waiting_approval/validate', array('uses' => 'RequestApprovalController@doValidate'));
+		
+		/* End Waiting Approval */
+		
+		/* Modul Waiting Release */
+		Route::get('/waiting_release',array('before'=>'privilege:request_release,view','uses'=>'RequestReleaseController@index'));
+		Route::get('/waiting_release/detail/{id_req}',array('before'=>'privilege:request_release,view','uses'=>'RequestReleaseController@showDetail'));
+		Route::post('/waiting_release/get_data',array('before'=>'privilege:request_release,view','uses'=>'RequestReleaseController@getData'));
+		Route::post('/waiting_release/cancel',array('before'=>'privilege:request_release,view','delete'=>'RequestReleaseController@doCancel'));
+		
+		Route::post('/waiting_release/save', array('before'=>'privilege:request_release,new','uses' => 'RequestReleaseController@doSave'));
+		Route::post('/waiting_release/validate', array('uses' => 'RequestReleaseController@doValidate'));
+		
+		/* End Waiting Release */
+	});
+
+	Route::group(array('prefix'=>'accounting','as'=>'accounting'),function()
+	{
+		/* Modul COA */
+		Route::get('/coa',array('before'=>'privilege:coa,view','uses'=>'COAController@index'));
+		Route::post('/coa/get_data',array('before'=>'privilege:coa,view','uses'=>'COAController@getData'));
+		Route::post('/coa/add',array('before'=>'privilege:coa,new','uses'=>'COAController@doAdd'));
+		Route::post('/coa/edit',array('before'=>'privilege:coa,edit','uses'=>'COAController@doEdit'));
+		Route::post('/coa/delete',array('before'=>'privilege:coa,delete','uses'=>'COAController@doDelete'));
+		
+		Route::post('/coa/get_row', array('uses' => 'COAController@getRow'));
+		/* End COA */
+
+		/* Modul Currency */
+		Route::get('/currency',array('before'=>'privilege:currency,view','uses'=>'CurrencyController@index'));
+		Route::post('/currency/get_data',array('before'=>'privilege:currency,view','uses'=>'CurrencyController@getData'));
+		Route::post('/currency/add',array('before'=>'privilege:currency,new','uses'=>'CurrencyController@doAdd'));
+		Route::post('/currency/edit',array('before'=>'privilege:currency,edit','uses'=>'CurrencyController@doEdit'));
+		Route::post('/currency/delete',array('before'=>'privilege:currency,delete','uses'=>'CurrencyController@doDelete'));
+		
+		Route::post('/currency/get_row', array('uses' => 'CurrencyController@getRow'));
+		/* End Currency */
+		
+		/* Modul Cash Adjustment */
+		// Route::get('/cash_adjustment',array('uses'=>'CashAdjustmentController@index'));
+
+		// Route::post('/cash_adjustment', array('uses' => 'CashAdjustmentController@doProcess'));
+		// Route::post('/cash_adjustment/save', array('uses' => 'CashAdjustmentController@doSave'));
+		// Route::post('/cash_adjustment/validate', array('uses' => 'CashAdjustmentController@doValidate'));
+		/* End Modul Cash Adjustment */
+		
+		/* Modul Cash/Bank Transfer */
+		Route::get('/cashbank_transfer',array('before'=>'privilege:cashbank_transfer,view','uses'=>'CashBankTransferController@index'));
+		Route::get('/cashbank_transfer/detail/{id_trx}',array('before'=>'privilege:cashbank_transfer,view','uses'=>'CashBankTransferController@showDetail'));
+		Route::post('/cashbank_transfer/get_data',array('before'=>'privilege:cashbank_transfer,view','uses'=>'CashBankTransferController@getData'));
+		Route::post('/cashbank_transfer/cancel',array('before'=>'privilege:cashbank_transfer,delete','uses'=>'CashBankTransferController@doCancel'));
+		
+		// new
+		Route::get('/cashbank_transfer/new/',array('before'=>'privilege:cashbank_transfer,new','uses'=>'CashBankTransferNewController@index'));
+		
+		Route::post('/cashbank_transfer/new', array('before'=>'privilege:cashbank_transfer,new','uses' => 'CashBankTransferNewController@doProcess'));
+		Route::post('/cashbank_transfer/new/save', array('before'=>'privilege:cashbank_transfer,new','uses' => 'CashBankTransferNewController@doSave'));
+		Route::post('/cashbank_transfer/new/validate', array('uses' => 'CashBankTransferNewController@doValidate'));
+		/* End Modul Cash Adjustment */
+		
+		/* Modul Bank Reconciliation */
+		// Route::get('/bank_recon',array('uses'=>'BankReconController@index'));
+
+		// Route::post('/bank_recon', array('uses' => 'BankReconController@doProcess'));
+		// Route::post('/bank_recon/save', array('uses' => 'BankReconController@doSave'));
+		// Route::post('/bank_recon/validate', array('uses' => 'BankReconController@doValidate'));
+		/* End Modul Bank Reconciliation */
+		
+		/* Modul Deposits */
+		Route::get('/deposits',array('before'=>'privilege:deposits,view','uses'=>'DepositsController@index'));
+		Route::get('/deposits/detail/{id_trx}',array('before'=>'privilege:deposits,view','uses'=>'DepositsController@showDetail'));
+		Route::post('/deposits/get_data',array('before'=>'privilege:deposits,view','uses'=>'DepositsController@getData'));
+		Route::post('/deposits/cancel',array('before'=>'privilege:deposits,delete','uses'=>'DepositsController@doCancel'));
+		
+		// new
+		Route::get('/deposits/new/',array('before'=>'privilege:deposits,new','uses'=>'DepositsNewController@index'));
+		
+		Route::post('/deposits/new', array('before'=>'privilege:deposits,new','uses' => 'DepositsNewController@doProcess'));
+		Route::post('/deposits/new/save', array('before'=>'privilege:deposits,new','uses' => 'DepositsNewController@doSave'));
+		Route::post('/deposits/new/validate', array('uses' => 'DepositsNewController@doValidate'));
+		/* End Modul Deposits */
+		
+		/* Modul Payments */
+		Route::get('/payments',array('before'=>'privilege:payments,view','uses'=>'PaymentsController@index'));
+		Route::get('/payments/detail/{id_trx}',array('before'=>'privilege:payments,view','uses'=>'PaymentsController@showDetail'));
+		Route::post('/payments/get_data',array('before'=>'privilege:payments,view','uses'=>'PaymentsController@getData'));
+		Route::post('/payments/cancel',array('before'=>'privilege:payments,delete','uses'=>'PaymentsController@doCancel'));
+		
+		// new
+		Route::get('/payments/new/',array('before'=>'privilege:payments,new','uses'=>'PaymentsNewController@index'));
+		
+		Route::post('/payments/new', array('before'=>'privilege:payments,new','uses' => 'PaymentsNewController@doProcess'));
+		Route::post('/payments/new/save', array('before'=>'privilege:payments,new','uses' => 'PaymentsNewController@doSave'));
+		Route::post('/payments/new/validate', array('uses' => 'PaymentsNewController@doValidate'));
+		/* End Modul Payments */
+		
+		/* Modul Account Receivable */
+		Route::get('/acct_receivable',array('before'=>'privilege:acct_receivable,view','uses'=>'AcctReceivableController@index'));
+		Route::get('/acct_receivable/detail/{id_trx}',array('before'=>'privilege:acct_receivable,view','uses'=>'AcctReceivableController@showDetail'));
+		Route::post('/acct_receivable/get_data',array('before'=>'privilege:acct_receivable,view','uses'=>'AcctReceivableController@getData'));
+		Route::post('/acct_receivable/cancel',array('before'=>'privilege:acct_receivable,delete','uses'=>'AcctReceivableController@doCancel'));
+		
+		// new
+		Route::get('/acct_receivable/new/',array('before'=>'privilege:acct_receivable,new','uses'=>'AcctReceivableNewController@index'));
+		
+		Route::post('/acct_receivable/new', array('before'=>'privilege:acct_receivable,new','uses' => 'AcctReceivableNewController@doProcess'));
+		Route::post('/acct_receivable/new/save', array('before'=>'privilege:acct_receivable,new','uses' => 'AcctReceivableNewController@doSave'));
+		Route::post('/acct_receivable/new/validate', array('uses' => 'AcctReceivableNewController@doValidate'));
+		
+		/* End Account Receivable */
+		
+		/* Modul Account Payable */
+		Route::get('/acct_payable',array('before'=>'privilege:acct_payable,view','uses'=>'AcctPayableController@index'));
+		Route::get('/acct_payable/detail/{id_trx}',array('before'=>'privilege:acct_payable,view','uses'=>'AcctPayableController@showDetail'));
+		Route::post('/acct_payable/get_data',array('before'=>'privilege:acct_payable,view','uses'=>'AcctPayableController@getData'));
+		Route::post('/acct_payable/cancel',array('before'=>'privilege:acct_payable,delete','uses'=>'AcctPayableController@doCancel'));
+		
+		// new
+		Route::get('/acct_payable/new/',array('before'=>'privilege:acct_payable,new','uses'=>'AcctPayableNewController@index'));
+		
+		Route::post('/acct_payable/new', array('before'=>'privilege:acct_payable,new','uses' => 'AcctPayableNewController@doProcess'));
+		Route::post('/acct_payable/new/save', array('before'=>'privilege:acct_payable,new','uses' => 'AcctPayableNewController@doSave'));
+		Route::post('/acct_payable/new/validate', array('before'=>'privilege:acct_payable,new','uses' => 'AcctPayableNewController@doValidate'));
+		
+		/* End Account Payable */
+		
+		/* Modul Memorial Jurnal */
+		Route::get('/memorial_journal',array('before'=>'privilege:memorial_journal,view','uses'=>'MemorialJournalController@index'));
+		Route::get('/memorial_journal/detail/{id_trx}',array('before'=>'privilege:memorial_journal,view','uses'=>'MemorialJournalController@showDetail'));
+		Route::post('/memorial_journal/get_data',array('before'=>'privilege:memorial_journal,view','uses'=>'MemorialJournalController@getData'));
+		Route::post('/memorial_journal/cancel',array('before'=>'privilege:memorial_journal,delete','uses'=>'MemorialJournalController@doCancel'));
+		
+		// new
+		Route::get('/memorial_journal/new/',array('before'=>'privilege:memorial_journal,new','uses'=>'MemorialJournalNewController@index'));
+		
+		Route::post('/memorial_journal/new', array('before'=>'privilege:memorial_journal,new','uses' => 'MemorialJournalNewController@doProcess'));
+		Route::post('/memorial_journal/new/save', array('before'=>'privilege:memorial_journal,new','uses' => 'MemorialJournalNewController@doSave'));
+		Route::post('/memorial_journal/new/validate', array('uses' => 'MemorialJournalNewController@doValidate'));
+		/* End Modul Memorial Jurnal */
+		
+		/* Modul Report */
+		
+			/* Modul General Journal */
+			Route::get('/report/general_journal',array('before'=>'privilege:general_journal,view','uses'=>'GeneralJournalController@index'));
+			Route::post('/report/general_journal',array('before'=>'privilege:general_journal,view','uses'=>'GeneralJournalController@showReport'));
+			/* End General Journal  */
+		
+			/* Modul Balance Sheet */
+			Route::get('/report/balance_sheet',array('before'=>'privilege:balance_sheet,view','uses'=>'BalanceSheetController@index'));
+			Route::post('/report/balance_sheet',array('before'=>'privilege:balance_sheet,view','uses'=>'BalanceSheetController@showReport'));
+			/* End Balance Sheet */
+		
+			/* Modul Trial Balance */
+			Route::get('/report/trial_balance',array('before'=>'privilege:trial_balance,view','uses'=>'TrialBalanceController@index'));
+			Route::post('/report/trial_balance',array('before'=>'privilege:trial_balance,view','uses'=>'TrialBalanceController@showReport'));
+			/* End Trial Balance */
+		
+			/* Modul Profit Loss */
+			Route::get('/report/profit_loss',array('before'=>'privilege:profit_loss,view','uses'=>'ProfitLossController@index'));
+			Route::post('/report/profit_loss',array('before'=>'privilege:profit_loss,view','uses'=>'ProfitLossController@showReport'));
+			/* End Profit Loss */
+		
+			/* Modul General Ledger */
+			Route::get('/report/general_ledger',array('before'=>'privilege:general_ledger,view','uses'=>'GeneralLedgerController@index'));
+			Route::post('/report/general_ledger',array('before'=>'privilege:general_ledger,view','uses'=>'GeneralLedgerController@showReport'));
+			/* End General Ledger  */
+			
+		/* End Report */
+	});
+
+	Route::group(array('prefix'=>'user_group','as'=>'user_group'),function()
+	{		
+		Route::get('',array('before'=>'privilege:user_group,view','uses'=>'UserGroupController@index'));
+		Route::get('/detail/{id_trx}',array('before'=>'privilege:user_group,view','uses'=>'UserGroupController@showDetail'));
+		Route::post('/get_data',array('before'=>'privilege:user_group,view','uses'=>'UserGroupController@getData'));
+			
+		Route::get('/new/',array('before'=>'privilege:user_group,new','uses'=>'UserGroupController@showNewEdit'));
+		
+		Route::get('/edit/{id_group}',array('before'=>'privilege:user_group,edit','uses'=>'UserGroupController@showNewEdit'));
+			
+		Route::post('/delete',array('before'=>'privilege:user_group,delete','uses'=>'UserGroupController@doDelete'));
+		
+		Route::post('/save', array('uses' => 'UserGroupController@doSave'));
+		Route::post('/validate', array('uses' => 'UserGroupController@doValidate'));
+	});
+
+	Route::group(array('prefix'=>'user_account','as'=>'user_account'),function()
+	{
+		Route::get('',array('before'=>'privilege:user_account,view','uses'=>'UserAccountController@index'));
+		Route::get('/detail/{id_trx}',array('before'=>'privilege:user_account,view','uses'=>'UserAccountController@showDetail'));
+		Route::post('/get_data',array('before'=>'privilege:user_account,view','uses'=>'UserAccountController@getData'));
+			
+		Route::get('/new/',array('before'=>'privilege:user_account,new','uses'=>'UserAccountController@showNewEdit'));
+		
+		Route::get('/edit/{id_user}',array('before'=>'privilege:user_account,edit','uses'=>'UserAccountController@showNewEdit'));
+			
+		Route::post('/delete',array('before'=>'privilege:user_account,delete','uses'=>'UserAccountController@doDelete'));
+		
+		Route::post('/save', array('uses' => 'UserAccountController@doSave'));
+		Route::post('/validate', array('uses' => 'UserAccountController@doValidate'));
+	});
+});
+
+Route::post('/datatables/{module}',array('uses'=>'DataTableController@ajax'));
+
+/*-------------------------------------------------------------------------------------------------
+BACK END ROUTING
+---------------------------------------------------------------------------------------------------*/
+
+if(Request::is('admin/*') or Request::is('admin')){
+
+    require __DIR__.'/routes_admin.php';
+}
+
+/*-------------------------------------------------------------------------------------------------
+BLADE EXTENTION
+---------------------------------------------------------------------------------------------------*/
+
+Blade::extend(function($value)
+{
+	$replace = array('@break', '@continue');
+	$to = array('<?php break; ?>', '<?php continue; ?>');
+	return str_replace($replace, $to, $value);
+});

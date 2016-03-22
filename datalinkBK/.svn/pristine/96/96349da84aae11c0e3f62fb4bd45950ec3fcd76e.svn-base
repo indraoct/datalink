@@ -1,0 +1,218 @@
+<?php 
+
+class GoodReceiptNewController extends BaseController 
+{
+	protected $_defaultModel = 'GoodReceiptModel';
+	protected $_pageTitle = 'New Good Receipt';
+	protected $_menuId = 'good_receipt';
+    
+	public function __construct()
+	{
+        
+    }
+    
+    public function index($idPo)
+	{
+		$idPo = decode($idPo);
+		$listVendor 	= GeneralModel::getSelectionList('m_vendor','id_vendor','vendor_name');
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+		$listProject 	= GeneralModel::getSelectionList('m_project','id_project','project_name');
+		$listEmp 		= GeneralModel::getSelectionList2('hs_hr_employee','emp_number','emp_firstname');
+		$trx_no		 = GeneralModel::getTrxNo('t_good_receipt','trx_no');
+		
+		$model 	= new $this->_defaultModel;
+		$poData 	= $model->getPO($idPo);
+		if(empty($poData['master']))
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		}
+
+		$poData = array(
+									'master'=>array(
+																'trx_no'=>$trx_no,
+																'id_vendor'=>$poData['master']->id_vendor,
+																'trx_date'=>'',
+																'id_project'=>'',
+																'note'=>'',
+																'no_ref'=>$poData['master']->po_no,
+																'id_recipient'=>'',
+															),
+									'detail'=>$poData['detail']
+								);
+		if(Session::get('action')=='back')
+		{
+			Session::forget('action');
+			$data = Session::get('goodReceipt');
+			$poData['master']['trx_date'] = $data['trx_date'];
+			$poData['master']['id_project'] = $data['id_project'];
+			$poData['master']['note'] = $data['note'];
+			$poData['master']['id_recipient'] = $data['id_recipient'];
+			$poData['item'] = $data['item'];
+		}
+		Session::forget('goodReceipt');
+		
+		$param = array(
+							'title'			=> $this->_pageTitle,
+							'title_desc'	=> 'Good Receipt',
+							'listVendor'	=> array('' => '-- Any Value --') + $listVendor,
+							'listWarehouse'	=> array('' => '-- Please Select --') + $listWarehouse,
+							'listProject'	=> array('' => '-- Please Select --') + $listProject,
+							'listEmp'	=> array('' => '-- Please Select --') + $listEmp,
+							'menu_id'	=> $this->_menuId,
+							'poData'			=> $poData,
+							'idPo'			=> encode($idPo),
+							'new'			=> hasPrivilege($this->_menuId,'new')
+						);
+        return View::make('modules.good_receipt.new',$param);
+    }
+
+	public function doValidate()
+	{
+        $input = Input::all();
+		$validate = true;
+		
+		$errorArr = array();
+		$alertMsg = 'An Error Occured. Please Try Again.';
+
+        $rules = array(
+								// 'idPo' 		=> 'required|unique:t_good_receipt,id_po',
+								'trx_date' 		=> 'required',
+								'id_vendor' 		=> 'required',
+								'id_project' 		=> 'required',
+								'id_recipient' 		=> 'required',
+							  );
+        $validator = Validator::make($input, $rules);
+
+		if($validator->fails())
+		{
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			$validate = false;
+		}
+		else
+		{
+			if(isset($input['item']))
+			{
+				$i=0;
+				foreach($input['item'] as $row)
+				{
+					$row['qty_received'] = defaultNumeric($row['qty_received']);
+
+					$rulesItem = array(
+										'qty_received' 		=> 'required|numeric',
+										'id_warehouse' 		=> 'required'
+									);
+					$validatorP = Validator::make($row, $rulesItem);
+					if($validatorP->fails())
+					{
+						foreach($rulesItem as $key=>$row)
+						{
+							$errorArr['item'][$i][$key] = $validatorP->messages()->first($key);
+						}
+						$validate = false;
+					}
+					$i++;
+				}
+			}
+			else
+			{
+				$validate = false;
+				$alertMsg = 'Please Check the Item';
+			}
+        }
+        if(!$validate)
+		{    
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> $alertMsg,
+						'error_msg'	=> $errorArr
+					);
+        }    
+        else
+		{                
+			$ret = array(
+						'status'		=> true,
+						'alert_msg'	=> '',
+						'error_msg'	=> array()
+					);
+        } //end of validator
+		
+		echo json_encode($ret);
+    }
+    
+    public function doProcess()
+	{
+		if(Request::isMethod('post')){
+			$input = Input::all();
+		}
+		else{
+			$input = Session::get('goodReceipt');
+		}
+
+		$listEmp 		= GeneralModel::getSelectionList2('hs_hr_employee','emp_number','emp_firstname');
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+		$param = array(
+							'title'				=> $this->_pageTitle.' - Confirm Page',
+							'title_desc'		=> $this->_pageTitle,
+							'menu_id'		=> $this->_menuId,
+							'listEmp'			=> $listEmp,
+							'listWarehouse'	=> $listWarehouse,
+						);
+
+		Session::put('goodReceipt',$input);
+
+		$projectModel = new ProjectModel;
+		$projectData = $projectModel->getRow($input['id_project']);
+		$input['project_name'] = $projectData->project_name;
+		
+		$vendorName = new VendorModel;
+		$vendorData = $vendorName->getRow($input['id_vendor']);
+		$input['vendor_name'] = $vendorData->vendor_name;
+		
+		$param = array_merge($param,$input);
+
+		return View::make('modules.good_receipt.confirm',$param);
+	}
+    
+    public function doSave()
+	{
+		$data = Session::get('goodReceipt');
+		$data['action'] = Input::get('action') ? Input::get('action') : $data['action'];
+
+		$data['idPo'] = decode($data['idPo']);
+        if($data['action']=='process')
+		{
+			$model = new $this->_defaultModel;
+			$id_trx = $model->insertData($data);
+
+			if($id_trx == true)
+			{
+				Session::forget('goodReceipt');
+				Session::forget('action');
+
+				$alertArr = array(
+									'alert' 			=> 'success',
+									'alert_msg' 	=> 'Transaction has been processed',
+								);
+				return Redirect::to('inventory/good_receipt/detail/'.encode($id_trx))->with($alertArr);
+			}
+			else
+			{
+				$alertArr = array(
+									'alert' 			=> 'error',
+									'alert_msg' 	=> 'Error with message : '.$id_trx.'<br/> Please Contact The Administrator.',
+								);
+				return Redirect::to('inventory/good_receipt/new')->with($alertArr);
+			}
+		}
+		else
+			return Redirect::to('inventory/good_receipt/new/'.encode($data['idPo']))->with('action', 'back');
+    }
+
+}

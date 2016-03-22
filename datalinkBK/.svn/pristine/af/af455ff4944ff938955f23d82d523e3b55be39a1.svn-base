@@ -1,0 +1,391 @@
+@extends('layouts.admin.default')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/scripts/datatable.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	function construct() {
+		/* BEGIN EVENT HANDLER */
+		// tombol simpan
+		$("#button").on('click', "#save", function(){
+			save();
+		});
+		
+		/* END EVENT HANDLER */
+                
+                
+               
+                
+		
+		/* BEGIN JS FUNCTION */
+		
+		
+		function clearError()
+		{
+			$('.form-group').removeClass('has-error'); 
+			$('.form-control').attr('data-original-title','');
+		}
+                
+                   //--------JQUERY perubahan status active - inactive       
+                $(".bootstrap-switch").on("click",function(){
+                    
+                    if($(".bootstrap-switch").hasClass('bootstrap-switch-on') === true){
+                        
+                        $("#status").val(1);
+                    }else{
+                        $("#status").val(0);
+                    }
+                });
+                
+                
+                //create item unit dapat di add
+                $("#itemUnit").select2({
+			placeholder: "-- Pilih --",
+			maximumInputLength: 100,
+			formatNoMatches: function(term) {
+				return '<input class="form-control" id="new_itemUnit" value="'+term+'">'+
+						   '<button class="btn btn-sm green filter-submit" id="add_itemUnit">Tambah Baru</button>'
+			}
+		})
+		.parent().find('.select2-with-searchbox').on('click','#add_itemUnit',function(){
+		
+			var newTerm = $('#new_itemUnit').val();
+			
+			var id = newItemUnit(newTerm);
+			
+			if(id!='')
+			{
+				$('<option value="'+id+'">'+newTerm+'</option>').appendTo('#itemUnit');
+				$('#itemUnit').select2('val',id); // select the new term
+				$("#itemUnit").select2('close');		// close the dropdown
+			}
+		});
+                
+                function newItemUnit(unit_name)
+		{			
+			var id = '';
+			$.ajax({
+				url: "{{ URL::to('/') }}/item/addUnit",
+				async: false,
+				type:"post",
+				data: 'unit_name='+unit_name+'&from=dropdown',
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+				success:function(result){
+					var result = eval('('+result+')');
+					Metronic.unblockUI();
+					// alert(result);
+					
+					id = result.id;
+					
+					if(result.status)
+					{
+						toastr['success'](result.alert_msg);
+					}
+					else
+					{
+						toastr['error'](result.alert_msg);
+					}
+				},
+				error:function(x,h,r)
+				{
+					alert(r);
+				}
+			})
+			return id;
+		}
+                
+             
+
+		function save()
+		{
+			clearError();
+            $.ajax({
+                url: "{{ URL::to('/') }}/item/{{$act}}",
+				type:"post",
+                data: $('#form').serialize(),
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+                success:function(result){
+					var result = eval('('+result+')');
+					Metronic.unblockUI();
+					// alert(result);
+					var alert_msg = '';
+                    if(result.status)
+					{
+						clearForm('#form');
+						toastr['success'](result.alert_msg);
+						setTimeout('', 500);
+						window.location.href ="{{ URL::to('/') }}/item";
+                    }
+					else
+					{
+						toastr['error'](result.alert_msg);
+						var errors = result.error_msg;
+						Object.keys(errors).forEach(function(key) {
+							if(errors[key])
+							{
+								$('#'+key).closest('.form-group').addClass('has-error');
+								$('#'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+								$('#s2id_'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+							}
+						});
+                    }
+                },
+                error:function(x,h,r)
+				{
+                    alert(r);
+                }
+            })
+		}
+		
+		if (jQuery().datepicker) {
+            $('.date-picker').datepicker({
+                rtl: Metronic.isRTL(),
+                orientation: "left",
+                autoclose: true
+            });
+		}
+
+		/* END JS FUNCTION */
+
+	};
+
+	<?php
+		$checkboxTax = 0;
+		$pkpDate = '';
+		
+	?>
+	function renderData()
+	{
+		
+	}
+	
+	function credit()
+	{
+		$(".credit").slideUp( "slow" );
+		if( $('#rTop').val() == 2)
+		{
+			$(".credit").slideDown( "slow" );
+		}
+	}
+
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		renderData();
+		credit();
+	});
+	</script>
+@stop
+@section('content')
+<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			{{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Inventory</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">Master</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="{{ URL::to('/') }}/item">Item</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">{{$act}}</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<!-- BEGIN PAGE CONTENT-->
+						<form role="form" id="form" class="form-horizontal" action="#">
+							<div class="form-body">
+									<ul class="nav nav-tabs">
+										<li class="active">
+											<a href="#general" data-toggle="tab">
+											General </a>
+										</li>
+									
+										<li>
+											<a href="#account" data-toggle="tab">
+											Accounting</a>
+										</li>
+									</ul>
+									<div class="tab-content">
+									
+										<div class="tab-pane active" id="general">
+											<!-- BEGIN GENERAL-->
+											<div class="form-body">
+												<div class="row">
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Item Code</label>
+															<div class="col-md-6">
+																{{ Form::hidden('id','',array('id'=>'idItem')) }}
+																{{ Form::text('itemCode','',array('id'=>'itemCode','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Barcode</label>
+															<div class="col-md-6">
+																{{ Form::text('barcode','',array('id'=>'barcode','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Name</label>
+															<div class="col-md-6">
+																{{ Form::text('itemName','',array('id'=>'itemName','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Unit</label>
+															<div class="col-md-6">
+																{{Form::select('itemUnit',$listUnit,0,array('id'=>'itemUnit','class'=>'form-control select2')) }}
+                                                                                                                                <span class="help-block help-block-error" for="itemUnit"></span>
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Item Category</label>
+															<div class="col-md-6">
+																{{Form::select('itemCategory',$listCategory,0,array('id'=>'itemCategory','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Type</label>
+															<div class="col-md-6">
+																{{Form::select('itemType',$listType,0,array('id'=>'itemType','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                            
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Brand</label>
+															<div class="col-md-6">
+																{{Form::select('itemBrand',$listBrand,0,array('id'=>'itemBrand','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Description</label>
+															<div class="col-md-6">
+																{{ Form::textarea('description','',array('id'=>'description','class'=>'form-control','size'=>'10x3')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Tax</label>
+															<div class="col-md-6">
+																{{Form::select('tax',$listTax,0,array('id'=>'tax','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label class="col-md-4 control-label">Status</label>
+                                                                                                                    <div class="col-md-6">
+															
+                                                                                                                        <input  id="status" type="radio" name="status" value="0" class="make-switch switch-radio1">
+                                                                                                                  
+                                                                                                                    </div>
+                                                                                                                </div> 
+                                                                                                                
+													</div>
+													<!--/span-->
+													
+												</div>
+												<!--/row-->
+												
+											</div>
+											<!-- END GENERAL-->
+										</div>
+									
+										<div class="tab-pane fade" id="account">
+											<!-- BEGIN ACCOUNTING-->
+											<div class="form-body">
+												<div class="row">
+													<div class="col-md-6">
+														<div class="portlet box blue">
+															<div class="portlet-title">
+																<div class="caption">
+																	<i class="fa fa-gift"></i> Acount
+																</div>
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Inventory</label>
+															<div class="col-md-6">
+																{{Form::select('inventory',$listInventory,0,array('id'=>'inventory','class'=>'form-control select2')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">COGS</label>
+															<div class="col-md-6">
+																{{Form::select('cogs',$listCOGS,0,array('id'=>'cogs','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Sales</label>
+															<div class="col-md-6">
+																{{Form::select('sales',$listSales,0,array('id'=>'sales','class'=>'form-control select2')) }}
+															</div>
+														</div>
+														
+                                                                                                                   
+													</div>
+													
+													<div class="col-md-6">
+														<div class="portlet box blue">
+															<div class="portlet-title">
+																<div class="caption">
+																	<i class="fa fa-gift"></i> List Purchase
+																</div>
+															</div>
+														</div>
+														<div class="form-group">
+															
+															<div class="col-md-6">
+																{{ Form::textarea('purchase','',array('id'=>'description','class'=>'form-control','size'=>'10x3')) }}
+														
+                                                                                                                        </div>
+														</div>
+														
+													</div>
+												</div>
+											</div>
+											<!-- END CONTACT-->
+										</div>
+									</div>
+							</div>
+						</form>
+
+				<div id="button" class="modal-footer">
+					<a href="{{ URL::to('/') }}/item"><button type="button" class="btn default" >Back</button></a>
+					<button type="button" id="save" class="btn blue">Save</button>
+				</div>
+	<!-- End Dialog Form -->
+	
+	<!-- END PAGE CONTENT-->
+@stop

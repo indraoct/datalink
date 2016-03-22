@@ -1,0 +1,125 @@
+<?php 
+
+require_once("assets/dhtmlxGantt//connector/db_phplaravel.php");
+require_once("assets/dhtmlxGantt//connector/gantt_connector.php");
+
+class ProjectTimelineController extends BaseController 
+{
+	protected $_defaultModel = 'TimelineModel';
+	protected $_pageTitle = 'Project';
+	protected $_menuId = 'project';
+    
+	public function __construct()
+	{
+        
+    }
+    
+    public function index($idProject)
+	{
+		$idProject = decode($idProject);
+		$filter = array('id'=>$idProject);
+		$model = new ProjectModel();
+		$data 	= $model->getData($filter);
+
+		if($data['data'][0]->status != 4){
+			$this->_menuId = 'open_project';
+		}
+
+		if($data['filter_count'] != 1)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		}
+		$param = array(
+							'title'			=> $this->_pageTitle,
+							'menu_id'		=> $this->_menuId,
+							'title_desc'	=> 'Project Timeline',
+							'page'		=> 'timelines',
+							'data'		=> $data['data'][0],
+							'id'			=> encode($idProject),
+						);
+        return View::make('modules.project.timeline',$param);
+    }
+
+	 public function load($idProject){
+		$idProject = decode($idProject);
+		$model = new $this->_defaultModel;
+
+		$task = $model->getTask($idProject);
+		$link = $model->getLink($idProject);
+		$res = array('data'=>$task,'links'=>$link);
+
+		echo json_encode($res);
+    }
+
+	 /**
+     * Saves events.
+     *
+     * @return events
+     */
+    public function save(){                                               
+		// Mysql
+		// $dbtype = "MySQL";
+		$dbtype = Config::get('database.connections.mysql.driver');
+		$ip = Config::get('database.connections.mysql.host');
+		$user  = Config::get('database.connections.mysql.username');
+		$pass = Config::get('database.connections.mysql.password');
+		$db = Config::get('database.connections.mysql.database');
+
+		// $res=mysql_connect($ip,$user,$pass);
+		// mysql_select_db($db);
+		$res = new PDO("mysql:host=$ip;dbname=$db;charset=utf8",$user, $pass);
+
+			$model = new $this->_defaultModel;
+			$param = Input::all();
+
+			if(!empty($param['ids']))
+			{
+				$tempID = explode(',',$param['ids']);
+				foreach($tempID as $key=>$value)
+				{
+					$param['ids'] = $value;
+					if($param[$param['ids'].'_!nativeeditor_status'] == 'inserted')
+					{
+						if($param['gantt_mode'] == 'tasks')
+						{
+							$insert = $model->insertTask($param);
+						}
+						elseif($param['gantt_mode'] == 'links')
+						{
+							$insert = $model->insertLink($param);
+						}
+					}
+					else if($param[$param['ids'].'_!nativeeditor_status'] == 'updated'){
+						if($param['gantt_mode'] == 'tasks')
+						{
+							$insert = $model->updateTask($param);
+						}
+						elseif($param['gantt_mode'] == 'links')
+						{
+							$insert = $model->updateLink($param);
+						}
+					}
+					else if($param[$param['ids'].'_!nativeeditor_status'] == 'deleted'){
+						if($param['gantt_mode'] == 'tasks')
+						{
+							$insert = $model->deleteTask($param[$param['ids'].'_id']);
+						}
+						elseif($param['gantt_mode'] == 'links')
+						{
+							$insert = $model->deleteLink($param[$param['ids'].'_id']);
+						}
+					}
+				}
+			}
+
+		$gantt = new JSONGanttConnector($res, $dbtype);   
+		$gantt->mix("open", 1);
+		$gantt->render_links("t_project_timeline_links", "id", "source,target,type");
+		$gantt->render_table("t_project_timeline_tasks","id","start_date,duration,text,progress,sortorder,parent","");
+    }
+
+}

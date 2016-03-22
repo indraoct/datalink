@@ -1,0 +1,279 @@
+<?php
+
+class PurchaseOrderModel {
+
+    protected $_table = 't_purchase_order';
+    protected $_id = 'id_trx';
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir) {
+        $data['id'] = $this->_id;
+
+        $tableColumn = array($this->_id, 'po_no', 'vendor_name', 'total');
+
+        $subquery = DB::table($this->_table . ' AS a')
+                ->select(array('id_po', 'a.po_no', 'a.po_date', 'a.owner', 'a.id_vendor', 'vendor_name', 'a.created_at', 'total', 'a.status'))
+                ->leftJoin('m_vendor AS b', 'a.id_vendor', '=', 'b.id_vendor');
+
+        $query = DB::table(DB::raw("({$subquery->toSql()}) as t"));
+
+        $data['count'] = $data['filter_count'] = $query->count();
+
+        if ($filter) {
+            
+        }
+
+        $data['data'] = $query->orderBy($tableColumn[$sortBy], $sortDir)->orderBy('created_at', 'desc')->skip($offset)->take($limit)->get();
+
+        return $data;
+    }
+
+    public function getDataSelect($term, $cust_id) {
+        $query = DB::table($this->_table)
+                ->select(array($this->_id . ' as id', 'tanggal', 'no_faktur', 'jatuh_tempo', 'total', 'sisa_bayar'))
+                ->where('canceled', 0)
+                ->where('owner', Crypt::decrypt(Session::get('owner')))
+                ->whereIn('status', array(1, 2))
+                ->where('id_customer', $cust_id)
+                ->where('no_faktur', 'LIKE', '%' . $term . '%');
+
+        $data['data'] = $query->orderBy('no_faktur')->take(100)->get();
+
+        return $data;
+    }
+
+    public function getRow($id) {
+        $query = DB::table($this->_table)
+                ->select(array($this->_id . ' as id', 'tanggal', 'no_faktur', 'jatuh_tempo', 'total', 'sisa_bayar'))
+                ->where('canceled', 0)
+                ->where('owner', Crypt::decrypt(Session::get('owner')))
+                ->where($this->_id, $id);
+
+        return $query->first();
+    }
+
+    public function getDetailInvoice($id_trx) {
+        $data = DB::table($this->_table . ' AS a')
+                ->select(array('a.*', 'b.nama_customer', 'b.termin_bayar', 'c.nama_sales'))
+                ->leftJoin('m_customer AS b', 'a.id_customer', '=', 'b.id_customer')
+                ->leftJoin('m_salesman AS c', 'a.id_salesman', '=', 'c.id_sales')
+                ->where('a.id_trx', $id_trx)
+                ->where('a.owner', Crypt::decrypt(Session::get('owner')))
+                ->first();
+
+        if ($data)
+            $data->produk = DB::table('t_trx_jual_detail')
+                    ->select('*')
+                    ->where('id_trx', $id_trx)
+                    ->get();
+
+        return toArray($data);
+    }
+
+    public function insertDataPOS($data) {
+        $owner = Crypt::decrypt(Session::get('owner'));
+
+        if ($data['no_isauto'])
+            $no_faktur = self::getNoInvoice();
+        else
+            $no_faktur = $data['no_faktur'];
+
+        $tanggal = defaultDate($data['tanggal']);
+        $total_bruto = defaultNumeric($data['total_bruto']);
+        $total_netto = defaultNumeric($data['total_netto']);
+        $hpp = defaultNumeric($data['hpp']);
+        $potongan_harga = $total_bruto - $total_netto;
+        $untung = $total_netto - $hpp;
+
+        $insertTrx = array(
+            'owner' => $owner,
+            'no_faktur' => $no_faktur,
+            'tanggal' => $tanggal,
+            'id_customer' => 0,
+            'total_bruto' => $total_bruto,
+            'total_diskon_item' => defaultNumeric($data['total_diskon_item']),
+            'sub_total' => defaultNumeric($data['sub_total']),
+            'tipe_diskon_global' => $data['tipe_diskon_global'],
+            'diskon_global' => defaultNumeric($data['diskon_global']),
+            'total_diskon_global' => defaultNumeric($data['total_diskon']),
+            'total_netto' => $total_netto,
+            'total' => $total_netto,
+            'potongan_harga' => $potongan_harga,
+            'hpp' => $hpp,
+            'untung' => $untung,
+            'tunai' => defaultNumeric($data['tunai']),
+            'kembali' => defaultNumeric($data['kembali']),
+            'status' => 3,
+            'created_by' => Session::get('user_name'),
+            'created_at' => DB::raw('now()')
+        );
+
+        $id_trx = DB::table('t_trx_jual')->insertGetId($insertTrx);
+
+        $paramStokAkun = array(
+            'owner' => $owner,
+            'kode_trx' => 'SI',
+            'id_ref' => $id_trx,
+            'no_ref' => $no_faktur,
+            'tanggal' => $tanggal,
+            'notes' => 'POS',
+        );
+
+        $insertTrxDetail = $paramStokDetail = array();
+        foreach ($data['produk'] as $p) {
+            $harga_satuan = defaultNumeric($p['harga_satuan']);
+            $harga_beli = defaultNumeric($p['harga_beli']);
+            $untung = $harga_satuan - $harga_beli;
+
+            $insertTrxDetail[] = array(
+                'id_trx' => $id_trx,
+                'id_cabang' => null,
+                'id_produk' => $p['id_produk'],
+                'kode_produk' => $p['kode_produk'],
+                'nama_produk' => $p['nama_produk'],
+                'harga_jual' => defaultNumeric($p['harga_jual']),
+                'harga_satuan' => $harga_satuan,
+                'harga_beli' => $harga_beli,
+                'untung' => $untung,
+                'tipe_diskon' => $p['tipe_diskon'],
+                'diskon' => defaultNumeric($p['diskon']),
+                'potongan_harga' => defaultNumeric($p['diskon_item']),
+                'qty' => defaultNumeric($p['qty']),
+                'satuan' => $p['satuan'],
+                'total_item' => defaultNumeric($p['total_item']),
+            );
+
+            $paramStokDetail[] = array(
+                'id_cabang' => null,
+                'id_produk' => $p['id_produk'],
+                'stok_out' => defaultNumeric($p['qty']),
+            );
+        }
+
+        DB::table('t_trx_jual_detail')->insert($insertTrxDetail);
+
+        $stok = new Stok($owner);
+        $stok->createTrx($paramStokAkun, $paramStokDetail);
+    }
+
+    public function insertDataInvoice($data) {
+        $owner = Crypt::decrypt(Session::get('owner'));
+
+        if ($data['action'] == 'process') {
+            $status = 1;
+            $no_draft = null;
+            if ($data['no_isauto'])
+                $no_faktur = self::getNoInvoice();
+            else
+                $no_faktur = $data['no_faktur'];
+        }
+        else {
+            $status = 0;
+            $no_faktur = null;
+            $no_draft = self::getNoDraft();
+        }
+
+        // delete trx draft
+        DB::table('t_trx_jual')->where('id_trx', $data['id_trx'])->delete();
+        DB::table('t_trx_jual_detail')->where('id_trx', $data['id_trx'])->delete();
+
+        $tanggal = defaultDate($data['tanggal']);
+        $total_bruto = defaultNumeric($data['total_bruto']);
+        $total_netto = defaultNumeric($data['total_netto']);
+        $hpp = defaultNumeric($data['hpp']);
+        $potongan_harga = $total_bruto - $total_netto;
+        $untung = $total_netto - $hpp;
+
+        $insertTrx = array(
+            'owner' => $owner,
+            'no_draft' => $no_draft,
+            'no_faktur' => $no_faktur,
+            'tanggal' => $tanggal,
+            'id_customer' => $data['customer'],
+            'termin_bayar' => $data['termin_bayar_c'],
+            'jatuh_tempo' => defaultDate($data['jatuh_tempo']),
+            'alamat_penagihan' => $data['alamat_tagih'],
+            'alamat_pengiriman' => $data['alamat_kirim'],
+            'id_salesman' => $data['salesman'],
+            'total_bruto' => $total_bruto,
+            'total_diskon_item' => defaultNumeric($data['total_diskon_item']),
+            'sub_total' => defaultNumeric($data['sub_total']),
+            'tipe_diskon_global' => $data['tipe_diskon_global'],
+            'diskon_global' => defaultNumeric($data['diskon_global']),
+            'total_diskon_global' => defaultNumeric($data['total_diskon']),
+            'total_netto' => $total_netto,
+            'total' => defaultNumeric($data['total']),
+            'sisa_bayar' => $status ? defaultNumeric($data['total']) : 0,
+            'biaya' => defaultNumeric($data['biaya']),
+            'potongan_harga' => $potongan_harga,
+            'hpp' => $hpp,
+            'untung' => $untung,
+            'status' => $status,
+            'created_by' => Session::get('user_name'),
+            'created_at' => DB::raw('now()')
+        );
+
+        $id_trx = DB::table('t_trx_jual')->insertGetId($insertTrx);
+
+        $paramStokAkun = array(
+            'owner' => $owner,
+            'kode_trx' => 'SI',
+            'id_ref' => $id_trx,
+            'no_ref' => $no_faktur,
+            'tanggal' => $tanggal,
+            'notes' => 'Faktur Penjualan',
+        );
+
+        $insertTrxDetail = $paramStokDetail = array();
+        foreach ($data['produk'] as $p) {
+            $harga_satuan = defaultNumeric($p['harga_satuan']);
+            $harga_beli = defaultNumeric($p['harga_beli']);
+            $untung = $harga_satuan - $harga_beli;
+
+            $insertTrxDetail[] = array(
+                'id_trx' => $id_trx,
+                'id_cabang' => null,
+                'id_produk' => $p['id_produk'],
+                'kode_produk' => $p['kode_produk'],
+                'nama_produk' => $p['nama_produk'],
+                'harga_jual' => defaultNumeric($p['harga_jual']),
+                'harga_satuan' => $harga_satuan,
+                'harga_beli' => $harga_beli,
+                'untung' => $untung,
+                'tipe_diskon' => $p['tipe_diskon'],
+                'diskon' => defaultNumeric($p['diskon']),
+                'potongan_harga' => defaultNumeric($p['diskon_item']),
+                'qty' => defaultNumeric($p['qty']),
+                'satuan' => $p['satuan'],
+                'total_item' => defaultNumeric($p['total_item']),
+            );
+
+            $paramStokDetail[] = array(
+                'id_cabang' => null,
+                'id_produk' => $p['id_produk'],
+                'stok_out' => defaultNumeric($p['qty']),
+            );
+        }
+
+        DB::table('t_trx_jual_detail')->insert($insertTrxDetail);
+
+        if ($data['action'] == 'process') {
+            $stok = new Stok($owner);
+            $stok->createTrx($paramStokAkun, $paramStokDetail);
+        }
+
+        return $id_trx;
+    }
+
+    public function cancelData($id) {
+        $updateArr = array(
+            'canceled' => 1,
+            'updated_by' => Session::get('user_name'),
+            'updated_at' => DB::raw('now()')
+        );
+
+        return DB::table($this->_table)
+                        ->where($this->_id, $id)
+                        ->update($updateArr);
+    }
+
+}

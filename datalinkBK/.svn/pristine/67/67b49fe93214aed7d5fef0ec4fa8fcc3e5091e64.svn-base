@@ -1,0 +1,54 @@
+<?php
+
+class StockOpnameNewController extends BaseController{
+ 
+    protected $_defaultModel = 'StockOpnameModel';
+    protected $_pageTitle = 'New';
+    protected $_menuId = 'stock_opname';
+    
+	public function __construct()
+	{
+        
+        }
+        
+        public function index(){
+            
+            $tableHeader = array(
+                                    array(
+                                                             'data' => 'no',
+                                                             'label' => '#',
+                                                             'width' => '5%',
+                                                     ),
+                                     array(
+                                                             'data' => 'item_name',
+                                                             'width' => '20%',
+                                                             'label' => 'Item Name ',
+                                                     ),
+                                     array(
+                                                             'data' => 'item_code',
+                                                             'width' => '15%',
+                                                             'label' => 'Item Code',
+                                                     ),
+                                     array(
+                                                             'data' => 'qty',
+                                                             'width' => '20%',
+                                                             'label' => 'Qty',
+                                                     ),
+                                     array(
+                                                             'data' => 'warehouse_name',
+                                                             'width' => '20%',
+                                                             'label' => 'Warehouse',
+                                                     ),);
+        
+            
+            $param = array('title'      => $this->_pageTitle,
+                           'title_desc'	=> 'Stock Opname',
+                           'menu_id'	=> $this->_menuId,
+                           'tableHeader'=> $tableHeader,);
+            
+            
+            return View::make('modules.stock_opname.new.index',$param);
+        }
+    
+}
+?>

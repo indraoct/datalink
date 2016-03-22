@@ -1,0 +1,87 @@
+<?php
+
+class StockOpnameModel{
+    
+    protected $_table = 't_stock_opname';
+    protected $_id = 'id_trx';
+    
+    protected $_table_detail = 't_stock_opname_detail';
+    protected $_id_detail = 'id_detail';
+    
+    protected $_table_stock = 't_item_stock';
+    protected $_id_stock = 'id_stock';
+
+
+
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note'))
+                                                        ->leftJoin($this->_table_detail,$this->_table_detail.'.id_trx','=',$this->_table.'.id_trx')
+                                                        ->leftJoin('m_warehouse','m_warehouse.id_warehouse','=',$this->_table_detail.'.id_warehouse')
+                                                        ->where($this->_table.'.is_deleted',0)
+                                                        ->where($this->_table.'.owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['trx_no'] != "")
+				$query->where('trx_no', 'LIKE', '%'.$filter['trx_no'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',  defaultDate($filter['date_from']));
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',defaultDate($filter['date_to']));
+                        
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+     
+     
+     public function getDataSelect($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note'))
+                                                        ->leftJoin($this->_table_detail,$this->_table_detail.'.id_trx','=',$this->_table.'.id_trx')
+                                                        ->leftJoin('m_warehouse','m_warehouse.id_warehouse','=',$this->_table_detail.'.id_warehouse')
+                                                        ->where($this->_table.'.is_deleted',0)
+                                                        ->where($this->_table.'.owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['trx_no'] != "")
+				$query->where('trx_no', 'LIKE', '%'.$filter['trx_no'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',  defaultDate($filter['date_from']));
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',defaultDate($filter['date_to']));
+                        
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+     
+     
+}

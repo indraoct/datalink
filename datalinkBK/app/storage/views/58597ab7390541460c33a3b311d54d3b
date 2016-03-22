@@ -1,0 +1,473 @@
+
+
+<?php $__env->startSection('css'); ?>
+	<!-- BEGIN PAGE LEVEL STYLES -->
+        <link href="<?php echo URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css'); ?>" rel="stylesheet" type="text/css"/>
+	<link href="<?php echo URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css'); ?>" rel="stylesheet" type="text/css"/>
+	<link href="<?php echo URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css'); ?>" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('js'); ?>
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+        <script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/scripts/datatable.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/bootbox/bootbox.min.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/moment.min.js'); ?>"></script>
+        
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	
+	function construct() {
+            
+             
+            
+	
+		/*START JS FUNCTION */
+                var i = <?php echo $countdetail; ?>;
+                
+                        /* DEFINE ELEMENT & OPTIONS HERE */
+
+                        if (jQuery().datepicker) {
+                            $('.date-picker').datepicker({
+                                rtl: Metronic.isRTL(),
+                                orientation: "left",
+                                autoclose: true
+                            });
+                        }
+                        
+                        var lastToast;
+                        
+                        
+                        
+                        var itemColumns = [
+					{ cTitle: "Item Code", cName: "item_code", cClass: "", cSize: 3 },
+					{ cTitle: "Item Name", cName: "item_name", cClass: "", cSize: 6 }
+				];
+
+                        /* END DEFINE ELEMENT  */
+   
+                        
+                        //Bagian #cari_item
+                        $("#cari_item").select2({
+			placeholder: "Please Type Item Code/Item Name",
+			allowClear: true,
+			minimumInputLength: 1,
+			ajax: {
+				url: '<?php echo URL::to('/'); ?>/inventory/opname/get_select_list',
+				dataType: 'json',
+				type: "GET",
+				//quietMillis: 200,
+				data: function (term) {
+                                     
+					return {
+						term: term
+					};
+				},
+				results: function (data) {
+                                   
+					return {results: data};
+				}
+			},
+			formatResult: function (item) {
+				
+				var text = '<div class="row">';
+				
+				if(item.key === 0)
+				{
+					$.each(itemColumns, function (i, col) {
+							
+						text = text + '<div class="col-md-' + col.cSize + ' alignCenter"><strong>' + col.cTitle + '</strong></div>';
+					});
+				}
+				
+				$.each(itemColumns, function (i, col) {
+						
+					if (item[col.cName] === undefined)
+						item[col.cName] = '';
+					text = text + '<div class="col-md-' + col.cSize + ' '+col.cClass+'">' + item[col.cName] + '</div>';
+				});
+				
+				return text + '</div>';
+			},
+			formatNoMatches: function(term) {
+                               toastr.clear(lastToast);
+			       toastr['error']("Input didn't match");	
+                               return "Input didn't match";
+                            }
+		})
+		.on("change", function(e) {
+		   
+			var isExist = false;
+			var $itemRow = {};
+                        
+                        
+			$('.id_item').each(function (obj) {
+				
+				if($(this).val()==e.val)
+				{
+					isExist = true;
+					$itemRow = $(this).closest('tr');
+					return false;
+				}
+			});
+			
+			if(isExist)
+			{
+                              $('#cari_item').select2('val','');				
+                              return false;
+			}
+			else
+				getRowItem(e.val);
+		})
+		.parent().find('.select2-with-searchbox').on('click','#add_item',function(){
+		});
+                
+              
+		/* END JS FUNCTION */
+                
+                
+                function getRowItem(id)
+		{
+                    
+                    $.ajax({
+				url: '<?php echo URL::to('/'); ?>/inventory/opname/get_row',
+				dataType: 'json',
+				type: 'POST',
+                                data: 'id='+id,
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+                                success:function(result){
+                                                        Metronic.unblockUI();
+
+                                                         $('#cari_item').select2('val','');
+                                                        insertRowItem(result);
+                                                        
+                                },
+                                error:function(x,h,r)
+                                                {
+                                    alert(r);
+                                }
+                            });
+                        
+                       
+		}
+                
+                
+                function insertRowItem(data)
+		{
+                    <?php 
+                       $valOpt = "<option>-Please Select-</option>";
+                         foreach($listWarehouse as $key=>$val){
+                             
+                             $valOpt .= "<option value=$key>".$val."</option>";
+                             
+                         }
+                         
+                         
+                    
+                    ?>
+                     var valOpt = '<?php echo $valOpt; ?>' ;
+                    
+			var $row = $([
+				'<tr role="row" class="item_row">',
+                                        '<td><center><a href="javascript:;" class="btn btn-xs red tooltips delete_row" data-original-title="Hapus"><i class="fa fa-times"></i></a></center></td>',
+                                        '<td><input type="hidden" name="item['+i+'][id_item]" id="id_item'+i+'" class="id_item"/><input type="hidden" name="item['+i+'][id_unit]" id="id_unit'+i+'" class="id_unit"/><input type="text" name="item['+i+'][item_code]" class="item_code form-control input-sm" readonly></td>',
+                                        '<td><input type="text" name="item['+i+'][item_name]" class="item_name form-control input-sm" readonly></td>', 
+					'<td><input type="text" name="item['+i+'][qty]" id="qty'+i+'" class="qty form-control input-sm currency"></td>',
+                                        '<td><select name="item['+i+'][id_warehouse]" onchange="generateQty('+i+')" id="id_warehouse'+i+'" class="id_warehouse form-control">'+valOpt+'</select></td>',
+				'</tr>'
+			].join(''));
+
+			$row.find('.currency').autoNumeric('init', <?php echo autoNumeric(); ?> );
+			
+			$row.find('.id_item').val(data.id_item);
+			$row.find('.id_unit').val(data.id_unit);
+			$row.find('.item_name').val(data.item_name);
+			$row.find('.item_code').val(data.item_code);
+			
+			$('.item_row:last', '#datatable').after($row);
+    
+                        
+			i++;
+		}
+                
+                // clear error
+                function clearError()
+		{
+			$('.item_row').removeClass('has-error'); 
+			$('.form-group').removeClass('has-error'); 
+			$('.form-control').attr('data-original-title','');
+		}
+                
+                // tombol proses
+		$("#form").on('click', "#process",function(){
+			
+			validate($(this).attr('id'));
+		});
+                
+                // tombol delete row
+		$("#datatable tbody").on('click', "a.delete_row", function(){
+			
+			$(this).parents('tr').remove();
+		});
+
+                
+                
+                function validate(action)
+		{			
+			clearError();
+			console.log(action)
+                            $.ajax({
+                                url: "<?php echo URL::to('/'); ?>/inventory/opname/new/validate",
+                                                type:"post",
+                                data: $('#form').serialize()+'&action='+action,
+                                                beforeSend:function(){
+                                                        Metronic.blockUI();
+                                                },
+                                success:function(result){
+                                                        var result = eval('('+result+')');
+                                                        Metronic.unblockUI();
+                                                        // alert(result);
+                                                        var alert_msg = '';
+                                                        if(result.status){
+                                                                $('<input />').attr('type', 'hidden')
+                                                                  .attr('name', 'action')
+                                                                  .attr('value', action)
+                                                                  .appendTo('#form');
+
+                                                                $("#form").submit();
+                                                        }else{
+                                                                toastr['error'](result.alert_msg);
+                                                                var errors = result.error_msg;
+                                                                Object.keys(errors).forEach(function(key) {
+                                                                        if(errors[key])
+                                                                        {
+                                                                                if(key=="item")
+                                                                                {
+                                                                                        Object.keys(errors[key]).forEach(function(n) {
+                                                                                                Object.keys(errors[key][n]).forEach(function(keyP) {
+                                                                                                        $('.'+keyP+':eq('+n+')').closest('.item_row').addClass('has-error'); 
+                                                                                                        $('.'+keyP+':eq('+n+')').attr("data-original-title", errors[key][n][keyP]).tooltip();
+                                                                                                });
+                                                                                        });
+                                                                                }
+                                                                                else
+                                                                                {
+                                                                                        $('#'+key).closest('.form-group').addClass('has-error'); 
+                                                                                        $('#'+key).attr("data-original-title", errors[key]).tooltip();
+                                                                                        $('#s2id_'+key).attr("data-original-title", errors[key]).tooltip();
+                                                                                }
+                                                                        }
+                                                                });
+                                    }
+                                },
+                                error:function(x,h,r)
+                                                {
+                                    alert(r);
+                                }
+                            })
+		}
+                
+                
+               
+
+	};
+        
+        
+         function generateQty(i){
+        
+                    var nilaiWarehouse = $('#id_warehouse'+i).val();
+                    var idItem         = $('#id_item'+i).val();
+                    
+                     $.ajax({
+				url: '<?php echo URL::to('/'); ?>/inventory/opname/get_qty_value',
+                                dataType: 'json',
+				type: 'POST',
+                                data: 'id_warehouse='+nilaiWarehouse+'&id_item='+idItem,
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+                                success:function(result){
+                                                        $("#qty"+i).val(result.qty);
+                                                        Metronic.unblockUI();
+                                                        
+                                },
+                                error:function(x,h,r)
+                                                {
+                                    alert(r);
+                                }
+                            });
+                    
+                    
+         }
+
+        
+		
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		<?php if(Session::get('alert')=='success'): ?>
+			toastr['success']('<?php echo Session::get("alert_msg"); ?>');
+		<?php endif; ?>
+	});
+	</script>
+<?php $__env->stopSection(); ?>
+<?php $__env->startSection('content'); ?>
+	<!-- BEGIN PAGE HEADER-->
+        <form id="form" method="post" action="<?php echo URL::to('/'); ?>/inventory/opname/new" class="form-horizontal">
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			<?php echo e(isset($title) ? $title : ''); ?> <small><?php echo e(isset($title_desc) ? $title_desc : ''); ?></small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Inventory</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+						<a href="<?php echo URL::to('/'); ?>/inventory/opname">Stock Opname</a>
+						<i class="fa fa-angle-right"></i>
+                                </li>
+                                <li>
+                                        <a href="#"><?php echo e(isset($title) ? $title : ''); ?></a>
+                                </li>
+				
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+        
+        
+	<!-- BEGIN PAGE CONTENT-->
+	<div class="row">
+		<div class="col-md-12">
+                    <div class="row">
+                        <div class="form-body">
+                                  <div class="col-md-6">
+                                      <label class="col-md-3">Date :</label>
+                                          <div class="form-group col-md-4">  
+                                              <?php $trx_date = isset($data) ? $data['trx_date'] : date(Config::get('format.date.php')); ?>
+                                               <div class="input-group date date-picker margin-bottom-5" data-date-format="<?php echo Config::get('format.date.default'); ?>">
+                                                                            
+                                                                            <?php echo Form::text('trx_date',$trx_date,array('id'=>'trx_date','class'=>'form-control input-sm','placeholder'=>'Date','readonly'=>true)); ?>
+
+                                                                            <span class="input-group-btn">
+                                                                            <button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+                                                                            </span>
+                                                </div>
+                                          </div>
+                                  </div>
+                          </div>
+                    </div>
+                    <div class="row">
+                      <div class="form-body">
+                              <div class="col-md-6">
+                                  <label class="col-md-3">Ref No :</label>
+                                        <?php $ref_no = isset($data) ? $data['ref_no'] : ''; ?>
+                                      <div class="form-group col-md-4">  
+                                           
+                                           <?php echo Form::text('ref_no',$ref_no,array('id'=>'ref_no','class'=>'form-control input-sm','placeholder'=>'Ref No')); ?>
+
+                                      </div>
+                              </div>
+                      </div>
+                    </div>
+                    <div class="row">
+                      <div class="form-body">
+                                <?php $note = isset($data) ? $data['note'] : ''; ?>
+                              <div class="col-md-6">
+                                  <label class="col-md-3">Note :</label>
+                                      <div class="form-group col-md-4">  
+                                           <?php echo Form::textarea('note',$note,array('id'=>'note','class'=>'form-control input-sm','placeholder'=>'Note','size'=>'10x3')); ?>
+
+                                      </div>
+                              </div>
+                      </div>
+                    </div>
+                    <div class="row">
+                      <div class="form-body">
+                           <div class="col-md-6">
+                                  <label class="col-md-3">Search Item :</label>
+                                      <div class="form-group col-md-6">  
+                                            <?php echo Form::text('item_code','',array('id'=>'cari_item','class'=>'form-control')); ?>
+
+                                      </div>
+                                      
+                              </div>
+                      </div>    
+                    </div>
+                    <div class="row">
+					<div class="col-md-12">
+						<div class="portlet">
+                                                    <div class="portlet-title">
+               
+                                                            <div class="portlet-body">
+
+                                                                            <div class="table-container">
+                                                                                    <table class="table table-striped table-bordered table-hover" id="datatable">
+                                                                                    <thead>
+                                                                                    <tr role="row" class="heading">
+                                                                                        <?php echo Form::hidden('is_fullscreen',$is_fullscreen); ?>
+
+                                                                                                                    <?php
+                                                                                                                    
+                                                                                                                            foreach($tableHeader as $content)
+                                                                                                                            {
+                                                                                                                                    echo "<th>{$content['label']}</th>";
+                                                                                                                            }
+                                                                                                                    ?>
+                                                                                    </tr>
+                                                                                    
+                                                                                    </thead>
+                                                                                    <tbody>
+                                                                                            <tr role="row" class="item_row"></tr>
+                                                                                            <?php if(isset($data)): ?>
+                                                                                                    <?php $i=0; ?>
+                                                                                                    <?php foreach($data['item'] as $p): ?>
+                                                                                                            <tr role="row" class="item_row">
+                                                                                                                    <td><center><a href="javascript:;" class="btn btn-xs red tooltips delete_row" data-original-title="Hapus"><i class="fa fa-times"></i></a></center></td>
+                                                                                                                    <td><input type="hidden" name="item[<?=$i?>][id_item]" value="<?php echo $p['id_item']; ?>" id="id_item<?php echo $i; ?>" class="id_item"><input type="hidden" name="item[<?=$i?>][id_unit]" id="id_unit<?php echo $i; ?>" class="id_unit"/><input type="text" id="item_code<?php echo $i; ?>" name="item[<?=$i?>][item_code]" value="<?php echo $p['item_code']; ?>" class="form-control input-sm item_code" readonly></td>
+                                                                                                                    <td><input type="text" id="item_name<?php echo $i; ?>" name="item[<?=$i?>][item_name]" value="<?php echo $p['item_name']; ?>" class="form-control input-sm item_name" readonly/></td>      
+                                                                                                                    <td><input type="text" id="qty<?php echo $i; ?>" name="item[<?=$i?>][qty]" value="<?php echo $p['qty']; ?>" class="form-control input-sm qty currency"/></td>
+                                                                                                                    <!--<td><input type="text" name="item[ <?php echo $i; ?> ][id_warehouse]" value="<?php echo $p['warehouse_name']; ?>" class="form-control input-sm id_warehouse"></td>-->
+                                                                                                                    <?php $warehouse = isset($data['item'][$i]['id_warehouse']) ? $data['item'][$i]['id_warehouse'] : '';?>
+                                                                                                                    <td><?php echo Form::select("item[$i][id_warehouse]",$listWarehouse,$warehouse,array('id'=>'id_warehouse'.$i,'class'=>'form-control id_warehouse',"onchange"=>"generateQty(".$i.")")); ?></td>
+                                                                                                            </tr>
+                                                                                                            <?php $i++; ?>
+                                                                                                    <?php endforeach; ?>
+                                                                                            <?php endif; ?>
+                                                                                    </tbody>
+                                                                                    </table>
+                                                                            </div>
+                                                                
+                                                                <div class="form-actions fluid">
+							            <div class="col-md-offset-5 col-md-7">
+							
+								     <button type="button" id="process" class="btn blue">Process</button>
+                                                                    </div>
+                                                                </div>
+
+                                                        </div>
+                                        </div>
+                                                             
+                             </div>
+                         </div>
+			<!-- End: life time stats -->
+		</div>
+                <div class="row">
+
+                </div>    
+	</div>
+   </div>  
+  </form>     
+<?php $__env->stopSection(); ?>
+<?php echo $__env->make('layouts.admin.default', array_except(get_defined_vars(), array('__data', '__path')))->render(); ?>

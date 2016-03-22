@@ -1,0 +1,448 @@
+@extends('layouts.admin.default')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/scripts/datatable.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	function construct() {
+		/* BEGIN EVENT HANDLER */
+		// tombol simpan
+		$("#button").on('click', "#save", function(){
+			save();
+		});
+		
+		/* END EVENT HANDLER */
+		
+		/* BEGIN JS FUNCTION */
+		
+		
+		function clearError()
+		{
+			$('.form-group').removeClass('has-error'); 
+			$('.form-control').attr('data-original-title','');
+		}
+
+		function save()
+		{
+			clearError();
+            $.ajax({
+                url: "{{ URL::to('/') }}/item/{{$act}}",
+				type:"post",
+                data: $('#form').serialize(),
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+                success:function(result){
+					var result = eval('('+result+')');
+					Metronic.unblockUI();
+					// alert(result);
+					var alert_msg = '';
+                    if(result.status)
+					{
+						clearForm('#form');
+						toastr['success'](result.alert_msg);
+						setTimeout('', 500);
+						window.location.href ="{{ URL::to('/') }}/item";
+                    }
+					else
+					{
+						toastr['error'](result.alert_msg);
+						var errors = result.error_msg;
+						Object.keys(errors).forEach(function(key) {
+							if(errors[key])
+							{
+								$('#'+key).closest('.form-group').addClass('has-error');
+								$('#'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+								$('#s2id_'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+							}
+						});
+                    }
+                },
+                error:function(x,h,r)
+				{
+                    alert(r);
+                }
+            })
+		}
+		
+		if (jQuery().datepicker) {
+            $('.date-picker').datepicker({
+                rtl: Metronic.isRTL(),
+                orientation: "left",
+                autoclose: true
+            });
+		}
+
+		/* END JS FUNCTION */
+
+	};
+
+	<?php
+		$checkboxTax = 0;
+		$pkpDate = '';
+		if($act == 'Edit')
+		{
+			
+	?>
+	function renderData()
+	{
+		$('#itemCode').val( '{{$item->item_code}}' ); 
+		$('#itemName').val( '{{$item->item_name}}' ); 
+		$('#itemCategory').select2('val', '{{$item->item_category}}');
+		
+	}
+	<?php
+		}
+		else{
+			echo "function renderData(){  }";
+		}
+	?>
+	function credit()
+	{
+		$(".credit").slideUp( "slow" );
+		if( $('#rTop').val() == 2)
+		{
+			$(".credit").slideDown( "slow" );
+		}
+	}
+
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		renderData();
+		credit();
+	});
+	</script>
+@stop
+@section('content')
+<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			{{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Inventory</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">Master</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="{{ URL::to('/') }}/item">Item</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">{{$act}}</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<!-- BEGIN PAGE CONTENT-->
+						<form role="form" id="form" class="form-horizontal" action="#">
+							<div class="form-body">
+									<ul class="nav nav-tabs">
+										<li class="active">
+											<a href="#general" data-toggle="tab">
+											General </a>
+										</li>
+										<li>
+											<a href="#stock" data-toggle="tab">
+											Stock</a>
+										</li>
+										<li>
+											<a href="#account" data-toggle="tab">
+											Accounting</a>
+										</li>
+									</ul>
+									<div class="tab-content">
+									
+										<div class="tab-pane active" id="general">
+											<!-- BEGIN GENERAL-->
+											<div class="form-body">
+												<div class="row">
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Item Code</label>
+															<div class="col-md-6">
+																{{ Form::hidden('id','',array('id'=>'idItem')) }}
+																{{ Form::text('itemCode','',array('id'=>'itemCode','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Barcode</label>
+															<div class="col-md-6">
+																{{ Form::text('barcode','',array('id'=>'barcode','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Name</label>
+															<div class="col-md-6">
+																{{ Form::text('itemName','',array('id'=>'itemName','class'=>'form-control')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Unit</label>
+															<div class="col-md-6">
+																{{Form::select('itemUnit',$listUnit,0,array('id'=>'itemUnit','class'=>'form-control select2')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Item Category</label>
+															<div class="col-md-6">
+																{{Form::select('itemCategory',$listCategory,0,array('id'=>'itemCategory','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Type</label>
+															<div class="col-md-6">
+																{{Form::select('itemType',$listType,0,array('id'=>'itemType','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                            
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Item Brand</label>
+															<div class="col-md-6">
+																{{Form::select('itemBrand',$listBrand,0,array('id'=>'itemBrand','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Description</label>
+															<div class="col-md-6">
+																{{ Form::textarea('description','',array('id'=>'description','class'=>'form-control','size'=>'10x3')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+															<label class="col-md-4 control-label">Tax</label>
+															<div class="col-md-6">
+																{{Form::select('tax',$listTax,0,array('id'=>'itemType','class'=>'form-control select2')) }}
+															</div>
+														</div>
+                                                                                                                <div class="form-group">
+                                                                                                                    <label class="col-md-4 control-label">Status</label>
+                                                                                                                    <div class="col-md-6">
+																 {{ Form::radio('status', '1') }} Active
+                                                                                                                                 {{ Form::radio('status', '0') }} Inactive
+															</div>
+                                                                                                                </div> 
+                                                                                                                
+													</div>
+													<!--/span-->
+													
+												</div>
+												<!--/row-->
+												
+											</div>
+											<!-- END GENERAL-->
+										</div>
+											
+										<div class="tab-pane fade" id="stock">
+											<!-- BEGIN STOCK-->
+											<div class="form-body">
+												<div class="row">
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Name</label>
+															<div class="col-md-3">
+																
+                                                                                                                        </div>
+															<div class="col-md-4">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Mobile Phone</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+												</div>
+												<!--/row-->
+												<div class="row">
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Position</label>
+															<div class="col-md-7">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Phone (Work)</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+												</div>
+												<!--/row-->
+												<div class="row">
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Address</label>
+															<div class="col-md-7">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+													<div class="col-md-6">
+														<div class="form-group">
+															<label class="col-md-4 control-label">Email</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+													<!--/span-->
+												</div>
+												<!--/row-->
+											</div>
+											<!-- END CONTACT-->
+										</div>
+										<div class="tab-pane fade" id="account">
+											<!-- BEGIN ACCOUNTING-->
+											<div class="form-body">
+												<div class="row">
+													<div class="col-md-6">
+														<div class="portlet box blue">
+															<div class="portlet-title">
+																<div class="caption">
+																	<i class="fa fa-gift"></i> Bank & Tax
+																</div>
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Bank</label>
+															<div class="col-md-6">
+																{{ Form::text('bank','',array('id'=>'bank','class'=>'form-control')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Bank Account</label>
+															<div class="col-md-6">
+																{{ Form::text('bankAcct','',array('id'=>'bankAcct','class'=>'form-control','onkeypress'=>'return Digits(event)')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Account Name</label>
+															<div class="col-md-6">
+																{{ Form::text('acctName','',array('id'=>'acctName','class'=>'form-control')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">N.P.W.P</label>
+															<div class="col-md-6">
+																{{ Form::text('npwp','',array('id'=>'npwp','class'=>'form-control')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">P.K.P</label>
+															<div class="col-md-6">
+																{{ Form::text('pkp','',array('id'=>'pkp','class'=>'form-control')) }}
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">P.K.P Date</label>
+															<div class="col-md-6">
+																<div class="input-group  date date-picker margin-bottom-5" data-date-format="{{ Config::get('format.date.default') }}">
+																	{{ Form::text('pkpDate',$pkpDate,array('class'=>'form-control form-filter input-sm fix-var','readonly'=>true)) }}
+																	<span class="input-group-btn">
+																	<button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+																	</span>
+																</div>
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Tax</label>
+															<div class="col-md-6">
+																{{ Form::checkbox('tax', 'Tax',$checkboxTax) }}
+															</div>
+														</div>
+                                                                                                                   
+													</div>
+													
+													<div class="col-md-6">
+														<div class="portlet box blue">
+															<div class="portlet-title">
+																<div class="caption">
+																	<i class="fa fa-gift"></i> Receiveable
+																</div>
+															</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Currency</label>
+															<div class="col-md-6">
+																</div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Term of Payment</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+														<div class="form-group credit">
+															<label class="col-md-4 control-label"></label>
+															<div class="col-md-4">
+																
+                                                                                                                        </div>
+															<label class="col-md-2 control-label">days</label>
+														</div>
+														<div class="form-group credit">
+															<label class="col-md-4 control-label">Credit Plafond</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+														<div class="form-group">
+															<label class="col-md-4 control-label">Account Receivable</label>
+															<div class="col-md-6">
+																
+                                                                                                                        </div>
+														</div>
+													</div>
+												</div>
+											</div>
+											<!-- END CONTACT-->
+										</div>
+									</div>
+							</div>
+						</form>
+
+				<div id="button" class="modal-footer">
+					<a href="{{ URL::to('/') }}/item"><button type="button" class="btn default" >Back</button></a>
+					<button type="button" id="save" class="btn blue">Save</button>
+				</div>
+	<!-- End Dialog Form -->
+	
+	<!-- END PAGE CONTENT-->
+@stop

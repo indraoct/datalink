@@ -1,0 +1,224 @@
+@extends('layouts.admin.default')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/scripts/datatable.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	function construct() {
+	
+		$("#credit").hide();
+		/* BEGIN EVENT HANDLER */
+		// tombol simpan
+		$("#button").on('click', "#save", function(){
+			save();
+		});
+		
+		/* END EVENT HANDLER */
+		
+		/* BEGIN JS FUNCTION */
+		
+		
+		function clearError()
+		{
+			$('.form-group').removeClass('has-error'); 
+			$('.form-control').attr('data-original-title','');
+		}
+
+		function save()
+		{			
+			clearError();
+            $.ajax({
+                url: "{{ URL::to('/') }}/project/{{$act}}",
+				type:"post",
+                data: $('#form').serialize(),
+				beforeSend:function(){
+					Metronic.blockUI();
+				},
+                success:function(result){
+					var result = eval('('+result+')');
+					Metronic.unblockUI();
+					// alert(result);
+					var alert_msg = '';
+                    if(result.status)
+					{
+						clearForm('#form');
+						toastr['success'](result.alert_msg);
+						setTimeout('', 500);
+						window.location.href ="{{ URL::to('/') }}/customer";
+                    }
+					else
+					{
+						toastr['error'](result.alert_msg);
+						var errors = result.error_msg;
+						Object.keys(errors).forEach(function(key) {
+							if(errors[key])
+							{
+								$('#'+key).closest('.form-group').addClass('has-error');
+								$('#'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+								$('#s2id_'+key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+							}
+						});
+                    }
+                },
+                error:function(x,h,r)
+				{
+                    alert(r);
+                }
+            })
+		}
+		
+		if (jQuery().datepicker) {
+            $('.date-picker').datepicker({
+                rtl: Metronic.isRTL(),
+                orientation: "left",
+                autoclose: true
+            });
+		}
+
+		/* END JS FUNCTION */
+
+	};
+
+	<?php
+		$proCode = array();
+		if($act == 'Edit')
+		{
+			$proCode = array('disabled' => 'disabled');
+	?>
+	function renderData()
+	{
+		$('#id_project').val( '{{$project->id_project}}' );
+		$('#project_code').val( '{{$project->project_code}}' ); 
+		$('#project_name').val( '{{$project->project_name}}' ); 
+		$('#description').val( '{{$project->description}}' ); 
+		$('#id_area').select2('val', '{{$project->id_area}}' ); 
+		$('#id_category').select2( 'val','{{$project->id_category}}' ); 
+		$('#id_customer').select2('val', '{{$project->id_customer}}');
+		$('#id_sales_person').select2('val', '{{$project->id_sales_person}}');
+	}
+	<?php
+		}
+		else{
+			echo "function renderData(){}";
+		}
+	?>
+	function credit()
+	{
+		$("#credit").hide();
+		if( $('#rTop').val() == 2)
+		{
+			$("#credit").show();
+		}
+	}
+
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		renderData();
+	});
+	</script>
+@stop
+
+@section('content')
+<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			{{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Project Management & Sales</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">Master</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="{{ URL::to('/') }}/project">project</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">{{$act}}</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<!-- BEGIN PAGE CONTENT-->
+		<form role="form" id="form" class="form-horizontal" action="#">
+			<div class="form-group">
+				<label class="col-md-3 control-label">Project Code</label>
+				<div class="col-md-5">
+					{{ Form::hidden('act','',array('id'=>'act')) }}
+					{{ Form::hidden('id','',array('id'=>'id_project')) }}
+					{{ Form::text('project_code','',array('id'=>'project_code','class'=>'form-control')+$proCode) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Project Name</label>
+				<div class="col-md-5">
+					{{ Form::text('project_name','',array('id'=>'project_name','class'=>'form-control')) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Project Category</label>
+				<div class="col-md-5">
+					{{Form::select('id_category',$listCategory,0,array('id'=>'id_category','class'=>'form-control select2')) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Customer</label>
+				<div class="col-md-5">
+					{{Form::select('id_customer',$listCustomer,0,array('id'=>'id_customer','class'=>'form-control select2')) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Sales Person</label>
+				<div class="col-md-5">
+					{{Form::select('id_sales_person',$listSales,0,array('id'=>'id_sales_person','class'=>'form-control select2')) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Project Area</label>
+				<div class="col-md-5">
+					{{Form::select('id_area',$listArea,0,array('id'=>'id_area','class'=>'form-control select2')) }}
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="col-md-3 control-label">Project Description</label>
+				<div class="col-md-5">
+					{{ Form::textarea('description','',array('id'=>'description','class'=>'form-control','size'=>'10x3')) }}
+				</div>
+			</div>
+		</form>
+	<!-- END PAGE CONTENT-->
+
+				<div id="button" class="modal-footer">
+					<a href="{{ URL::to('/') }}/project"><button type="button" class="btn default" >Back</button></a>
+					<button type="button" id="save" class="btn blue">Save</button>
+				</div>
+	<!-- End Dialog Form -->
+	
+	<!-- END PAGE CONTENT-->
+@stop

@@ -1,0 +1,101 @@
+<?php
+
+class StockOpnameModel{
+    
+    protected $_table = 't_stock_opname';
+    protected $_id = 'id_trx';
+    
+    protected $_table_detail = 't_stock_opname_detail';
+    protected $_id_detail = 'id_detail';
+    
+    protected $_table_stock = 't_item_stock';
+    protected $_id_stock = 'id_stock';
+    
+    protected $_table_item = 'm_item';
+    protected $_id_item  = 'id_item';
+
+
+
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note'))
+                                                        ->leftJoin($this->_table_detail,$this->_table_detail.'.id_trx','=',$this->_table.'.id_trx')
+                                                        ->leftJoin('m_warehouse','m_warehouse.id_warehouse','=',$this->_table_detail.'.id_warehouse')
+                                                        ->where($this->_table.'.is_deleted',0)
+                                                        ->where($this->_table.'.owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['trx_no'] != "")
+				$query->where('trx_no', 'LIKE', '%'.$filter['trx_no'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',  defaultDate($filter['date_from']));
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',defaultDate($filter['date_to']));
+                        
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+     
+     
+     public function getDataSelect($term,$item_code)
+	{		
+		$query = DB::table($this->_table_item)
+						->select(array($this->_id_item.' as id','item_code','item_name'))
+						->where('is_deleted',0)
+						->where('owner', Crypt::decrypt(Session::get('owner')))
+						->where('item_code',$item_code);
+		
+		$data['data'] = $query->orderBy('id_item')->take(100)->get();
+		
+		return $data;
+	}
+     
+     
+     public function getRow($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table_stock.'.'.$this->_id_stock, 'b.item_name','b.item_code','a.stock_initial','c.warehouse_name');
+                     $query = DB::table($this->_table_stock." as a")
+                                                        ->select(array('a.'.$this->_id_stock, 'b.item_name','b.item_code',DB::raw('SUM(a.stock_initial + a.stock_in - a.stock_out) AS qty'),'c.warehouse_name'))
+                                                        ->leftJoin('m_item as b','a.id_item','=','b.id_item')
+                                                        ->leftJoin('m_warehouse as c','c.id_warehouse','=','a.id_warehouse')
+                                                        ->where('a.is_deleted',0)
+                                                        ->where('a.owner', Crypt::decrypt(Session::get('owner')))
+                                                        ->groupBy('b.id_item');
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['id_item'] != "")
+				$query->where('b.id_item', 'LIKE', '%'.$filter['id_item'].'%');
+			
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+     
+     
+}

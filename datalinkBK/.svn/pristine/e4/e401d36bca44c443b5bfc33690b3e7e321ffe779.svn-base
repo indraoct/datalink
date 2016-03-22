@@ -1,0 +1,96 @@
+<?php
+
+Class Stock
+{    
+	protected $_owner;
+
+	public function __construct($owner)
+	{
+		$this->_owner		=  $owner;
+	}
+	
+	public function createTrx($param,$paramDetail)
+	{
+        $insertTrx = array(
+		
+            'owner' 		=> $this->_owner,
+            'trx_code'	=> $param['trx_code'],
+            'trx_date'		=> $param['trx_date'],
+            'id_ref'			=> $param['id_ref'],
+            'no_ref'		=> $param['no_ref'],
+            'notes' 		=> $param['notes'],
+            'created_at'	=> DB::raw('now()')
+
+        );
+		
+		$id_trx = DB::table('t_trx_stock')->insertGetId($insertTrx);
+		
+		$insertTrxDetail = array();
+		foreach($paramDetail as $row)
+		{
+			$id_warehouse = $row['id_warehouse'];
+			$id_item = $row['id_item'];
+			$stock_in = isset($row['stock_in']) ? $row['stock_in'] : 0;
+			$stock_out = isset($row['stock_out']) ? $row['stock_out'] : 0;
+		
+			$remaining_stock = $this->updateStockWarehouse($id_warehouse,$id_item,$stock_in,$stock_out);
+		
+			$insertTrxDetail[] = array(
+			
+				'id_trx'						=> $id_trx,
+				'id_warehouse'		=> $id_warehouse,
+				'id_item'					=> $id_item,
+				'stock_in'					=> $stock_in,
+				'stock_out'				=> $stock_out,
+				'remaining_stock'	=> $remaining_stock,
+				
+			);
+		}
+		
+		DB::table('t_trx_stock_detail')->insert($insertTrxDetail);
+	}
+	
+	function updateStockWarehouse($id_warehouse,$id_item,$stock_in,$stock_out)
+	{
+		$dataStock = DB::table('t_item_stock')
+								->where('owner',$this->_owner)
+								->where('id_warehouse',$id_warehouse)
+								->where('id_item',$id_item)
+								->first();
+		if($dataStock)
+		{
+			$stock_initial = $dataStock->stock_initial;
+			$stock_in += $dataStock->stock_in;
+			$stock_out += $dataStock->stock_out;
+			$updateArr = array(
+				'stock_in'	=> $stock_in,
+				'stock_out'	=> $stock_out
+			);
+		   
+			DB::table('t_item_stock')
+					->where('id',$dataStock->id)
+					->update($updateArr);
+		}
+		else
+		{
+			$stock_initial = 0;
+			$insertArr = array(
+							'owner' 		=> $this->_owner,
+							'id_warehouse' 	=> $id_warehouse,
+							'id_item'	=> $id_item,
+							'stock_initial'	=> $stock_initial,
+							'stock_in' 		=> $stock_in,
+							'stock_out' 	=> $stock_out,
+						);
+						
+			DB::table('t_item_stock')->insert($insertArr);
+		}
+		
+		return ($stock_initial + $stock_in - $stock_out);
+	}    
+	
+	function getRemainingStock($id_item,$id_warehouse)
+	{
+		
+	}
+}

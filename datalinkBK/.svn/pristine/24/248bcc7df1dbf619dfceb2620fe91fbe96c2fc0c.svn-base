@@ -1,0 +1,718 @@
+<?php
+
+class InventoryController extends BaseController 
+{
+	protected $_defaultModel = 'InventoryModel';
+	protected $_pageTitle = 'View Stock';
+	protected $_menuId = 'view_stock';
+    
+	public function __construct()
+	{
+        
+        }
+        
+        public function index(){
+            
+            $listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+            $report = "View Stock";
+            
+       
+            /*
+             * Export
+             */
+            
+            $tableHeader = array(
+                                    array(
+                                                             'data' => 'no',
+                                                             'label' => '#',
+                                                             'width' => '5%',
+                                                     ),
+                                     array(
+                                                             'data' => 'item_code',
+                                                             'width' => '5%',
+                                                             'label' => 'Item Code',
+                                                     ),
+                                     array(
+                                                             'data' => 'item_name',
+                                                             'width' => '5%',
+                                                             'label' => 'Item Name',
+                                                     ),
+                                     array(
+                                                             'data' => 'qty',
+                                                             'label' => 'Qty',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'min_stock',
+                                                             'label' => 'Min',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'max_stock',
+                                                             'label' => 'Max',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'action',
+                                                             'label' => 'Action',
+                                                             'width' => '20%',
+                                                             'bSortable' => 'false',
+                                                             'className' => 'alignCenter',
+                                                     ),);
+            
+                 $param = array(
+							'title'			=> $this->_pageTitle,
+							'title_desc'	=> 'Inventory',
+							'menu_id'		=> $this->_menuId,
+                                                        'listWarehouse' => array('' => '-- Please Select --') + $listWarehouse,
+                                                        'report'   => $report,
+                                                        'tableHeader'			=> $tableHeader,
+						);
+            
+            if (Request::isMethod('post'))
+		{
+			$allParams = Input::all();
+			$export = isset($allParams['export']) ? $allParams['export'] : null;
+			$exportHeader = simpleArray($tableHeader,'label');
+			array_pop($exportHeader);
+
+			if( $export == 'xls' || $export == 'csv' )
+			{
+				$data[] = $exportHeader;
+				$data 	= array_merge($data,$this->getData());
+
+				Excel::create('Inventory'.$allParams['report'], function($excel) use($data) {
+					$excel->sheet('Sheetname', function($sheet) use($data) {
+						$sheet->fromArray($data);
+					});
+				})->export($export);
+			}
+			else if( $export == 'pdf' )
+			{
+				$data 	= $this->getData();
+				$exportHeader = simpleArray($tableHeader,'label');
+				array_pop($exportHeader);
+				$paramPdf['tableHeader'] = $exportHeader;
+				$paramPdf['data'] = $data;
+
+				$destination = public_path().'/';
+				$fileName = 'Inventory'.$allParams['report'].'.pdf';
+				$pdf = App::make('dompdf');
+				$pdf->loadView('pdf.datatable',$paramPdf)
+						->save($destination.$fileName);
+				header('Content-Description: File Transfer');
+				header('Content-Type: application/octet-stream');
+				header('Content-Disposition: attachment; filename="'.$fileName.'"');
+				header('Content-Transfer-Encoding: binary');
+				header('Expires: 0');
+				header('Cache-Control: must-revalidate');
+				header('Pragma: public');
+				header('Content-Length: ' . filesize($destination.$fileName));
+
+				readfile($destination.$fileName);
+	    		@unlink($destination.$fileName);
+			}
+		}
+            
+            
+            
+            return View::make('modules.inventory.index',$param);
+        }
+        
+        public function getData(){
+            
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+                        
+                        
+                        
+                        
+                        if (  Input::has('export') ){
+                                $iDisplayLength = intval( (isset($param['length'])) ? $param['length'] : $param['datatable_length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval( (isset($param['start'])) ? $param['start'] : 0);
+                                $draw = intval( (isset($param['draw'])) ? $param['draw'] : 0);
+                                $sortBy = (isset($param['order'][0]['column'])) ? $param['order'][0]['column'] : 1;
+                                $sortDir = (isset($param['order'][0]['dir'])) ? $param['order'][0]['dir'] : "asc";
+                                $filter = isset($param['filter']) ? $param['filter'] : array();
+                        }else{
+                                $iDisplayLength = intval($param['length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval($param['start']);
+                                $draw = intval($param['draw']);
+                                $sortBy = $param['order'][0]['column'];
+                                $sortDir = $param['order'][0]['dir'];
+                                $filter = isset($param['filter']) ? $param['filter'] : array();
+                        }
+                        
+                        
+                        
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+			
+		
+                        if ( ! Input::has('export') )
+			{
+				echo $this->parseData($get,$offset,$draw);
+			}
+			else{
+				$export = isset($param['export']) ? $param['export'] : null;
+				return $this->parseData($get,$offset,$draw,$export);
+			}
+		
+            
+        }
+        
+        
+        public function showInventoryCard($id_stock){
+            
+            $id_stock = decode($id_stock);
+            
+            $model = new $this->_defaultModel;
+	    $getDetail = $model->getDetail($id_stock);
+            
+            $report = 'Stock Card';
+
+		if(!$getDetail)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		} 
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+                
+                $tableHeader = array(
+                                    array(
+                                                             'data' => 'no',
+                                                             'label' => '#',
+                                                             'width' => '5%',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_date',
+                                                             'width' => '7%',
+                                                             'label' => 'Date',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_type',
+                                                             'width' => '10%',
+                                                             'label' => 'Transaction Type',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_no',
+                                                             'label' => 'Transaction No',
+                                                             'width' => '10%',
+                                                     ),
+                                     array(
+                                                             'data' => 'capital_price',
+                                                             'label' => 'Capital Price',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'stock_in',
+                                                             'label' => 'Stock In',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                      array(
+                                                             'data' => 'stock_out',
+                                                             'label' => 'Stock Out',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                      array(
+                                                             'data' => 'remaining_stock',
+                                                             'label' => 'Remaining Stock',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'balance',
+                                                             'label' => 'Balance',
+                                                             'className' => 'alignRight',
+                                                     ),);
+		
+                
+                
+                $param = array(
+						'title'					=> 'Stock Card',
+						'title_desc'		=> '',
+						'menu_id'		=> $this->_menuId,
+                                                'listWarehouse'	=> array('' => '-- Please Select --') + $listWarehouse,
+                                                'inventory' => $getDetail['inventory'],
+                                                'report'    => $report,
+                                                'tableHeader'			=> $tableHeader,
+					);
+                
+                
+                if (Request::isMethod('post'))
+		{
+			$allParams = Input::all();
+			$export = isset($allParams['export']) ? $allParams['export'] : null;
+			$exportHeader = simpleArray($tableHeader,'label');
+			array_pop($exportHeader);
+
+			if( $export == 'xls' || $export == 'csv' )
+			{
+				$data[] = $exportHeader;
+				$data 	= array_merge($data,$this->getDataInventoryCard());
+
+				Excel::create('Inventory'.$allParams['report'], function($excel) use($data) {
+					$excel->sheet('Sheetname', function($sheet) use($data) {
+						$sheet->fromArray($data);
+					});
+				})->export($export);
+			}
+			else if( $export == 'pdf' )
+			{
+				$data 	= $this->getDataInventoryCard();
+				$exportHeader = simpleArray($tableHeader,'label');
+				array_pop($exportHeader);
+				$paramPdf['tableHeader'] = $exportHeader;
+				$paramPdf['data'] = $data;
+
+				$destination = public_path().'/';
+				$fileName = 'Inventory'.$allParams['report'].'.pdf';
+				$pdf = App::make('dompdf');
+				$pdf->loadView('pdf.datatable',$paramPdf)
+						->save($destination.$fileName);
+				header('Content-Description: File Transfer');
+				header('Content-Type: application/octet-stream');
+				header('Content-Disposition: attachment; filename="'.$fileName.'"');
+				header('Content-Transfer-Encoding: binary');
+				header('Expires: 0');
+				header('Cache-Control: must-revalidate');
+				header('Pragma: public');
+				header('Content-Length: ' . filesize($destination.$fileName));
+
+				readfile($destination.$fileName);
+	    		@unlink($destination.$fileName);
+			}
+		}
+                
+                
+		return View::make('modules.inventory.card',$param);
+             
+             
+            
+        }
+        
+        public function showInventoryCardPost(){
+            
+            $id_stock = $_POST['id_stock'];
+            $id_item  = $_POST['id_item'];
+            $model = new $this->_defaultModel;
+	    $getDetail = $model->getDetail($id_stock);
+            
+            $report = 'Stock Card';
+
+		if(!$getDetail)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		} 
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+                
+                $tableHeader = array(
+                                    array(
+                                                             'data' => 'no',
+                                                             'label' => '#',
+                                                             'width' => '5%',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_date',
+                                                             'width' => '7%',
+                                                             'label' => 'Date',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_type',
+                                                             'width' => '10%',
+                                                             'label' => 'Transaction Type',
+                                                     ),
+                                     array(
+                                                             'data' => 'trx_no',
+                                                             'label' => 'Transaction No',
+                                                             'width' => '10%',
+                                                     ),
+                                     array(
+                                                             'data' => 'capital_price',
+                                                             'label' => 'Capital Price',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'stock_in',
+                                                             'label' => 'Stock In',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                      array(
+                                                             'data' => 'stock_out',
+                                                             'label' => 'Stock Out',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                      array(
+                                                             'data' => 'remaining_stock',
+                                                             'label' => 'Remaining Stock',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                     array(
+                                                             'data' => 'balance',
+                                                             'label' => 'Balance',
+                                                             'className' => 'alignRight',
+                                                     ),
+                                    array(
+                                                             'data' => '',
+                                                             'label' => 'Action',
+                                                             'className' => 'alignRight',
+                                                     ),);
+		
+                
+                
+                $param = array(
+						'title'					=> 'Stock Card',
+						'title_desc'		=> '',
+						'menu_id'		=> $this->_menuId,
+                                                'listWarehouse'	=> array('' => '-- Please Select --') + $listWarehouse,
+                                                'inventory' => $getDetail['inventory'],
+                                                'report'    => $report,
+                                                'tableHeader'			=> $tableHeader,
+					);
+                
+                
+                if (Request::isMethod('post'))
+		{
+			$allParams = Input::all();
+			$export = isset($allParams['export']) ? $allParams['export'] : null;
+			$exportHeader = simpleArray($tableHeader,'label');
+			array_pop($exportHeader);
+
+			if( $export == 'xls' || $export == 'csv' )
+			{
+				$data[] = $exportHeader;
+				$data 	= array_merge($data,$this->getDataInventoryCardPost($id_item));
+
+				Excel::create('Inventory'.$allParams['report'], function($excel) use($data) {
+					$excel->sheet('Sheetname', function($sheet) use($data) {
+						$sheet->fromArray($data);
+					});
+				})->export($export);
+			}
+			else if( $export == 'pdf' )
+			{
+				$data 	= $this->getDataInventoryCardPost($id_item);
+				$exportHeader = simpleArray($tableHeader,'label');
+				array_pop($exportHeader);
+				$paramPdf['tableHeader'] = $exportHeader;
+				$paramPdf['data'] = $data;
+
+				$destination = public_path().'/';
+				$fileName = 'Inventory'.$allParams['report'].'.pdf';
+				$pdf = App::make('dompdf');
+				$pdf->loadView('pdf.datatable',$paramPdf)
+						->save($destination.$fileName);
+				header('Content-Description: File Transfer');
+				header('Content-Type: application/octet-stream');
+				header('Content-Disposition: attachment; filename="'.$fileName.'"');
+				header('Content-Transfer-Encoding: binary');
+				header('Expires: 0');
+				header('Cache-Control: must-revalidate');
+				header('Pragma: public');
+				header('Content-Length: ' . filesize($destination.$fileName));
+
+				readfile($destination.$fileName);
+	    		@unlink($destination.$fileName);
+			}
+		}
+                
+                
+		return View::make('modules.inventory.card',$param);
+             
+             
+            
+        }
+        
+        public function getDataInventoryCard (){
+          
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			if (  Input::has('export') ){
+                                $iDisplayLength = intval( (isset($param['length'])) ? $param['length'] : $param['datatable_length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval( (isset($param['start'])) ? $param['start'] : 0);
+                                $draw = intval( (isset($param['draw'])) ? $param['draw'] : 0);
+                                $sortBy = (isset($param['order'][0]['column'])) ? $param['order'][0]['column'] : 1;
+                                $sortDir = (isset($param['order'][0]['dir'])) ? $param['order'][0]['dir'] : "asc";
+                                $filter = isset($param['filter']) ? $param['filter'] : array();
+                        }else{
+                                $iDisplayLength = intval($param['length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval($param['start']);
+                                $draw = intval($param['draw']);
+                                $sortBy = $param['order'][0]['column'];
+                                $sortDir = $param['order'][0]['dir'];
+                                $filter = isset($param['filter']) ? $param['filter'] : array();
+                        }
+                        
+			$model = new $this->_defaultModel;
+			$get = $model->getDataStock($filter, $limit, $offset, $sortBy, $sortDir);
+                        
+                         if ( ! Input::has('export') )
+			{
+				echo $this->parseDataCard($get,$offset,$draw);
+			}
+			else{
+				$export = isset($param['export']) ? $param['export'] : null;
+				return $this->parseDataCard($get,$offset,$draw,$export);
+			}
+			
+			
+            
+            
+        }
+        
+        public function getDataInventoryCardPost ($id_item){
+         
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+                        
+                        $param['filter'] = array_merge($param['filter'],array('id_item'=>$id_item));
+			
+			if (  Input::has('export') ){
+                                $iDisplayLength = intval( (isset($param['length'])) ? $param['length'] : $param['datatable_length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval( (isset($param['start'])) ? $param['start'] : 0);
+                                $draw = intval( (isset($param['draw'])) ? $param['draw'] : 0);
+                                $sortBy = (isset($param['order'][0]['column'])) ? $param['order'][0]['column'] : 1;
+                                $sortDir = (isset($param['order'][0]['dir'])) ? $param['order'][0]['dir'] : "asc";
+                                $filter = isset($param['filter']) ? $param['filter'] :array();
+                                
+                        }else{
+                                $iDisplayLength = intval($param['length']);
+                                $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+                                $offset = intval($param['start']);
+                                $draw = intval($param['draw']);
+                                $sortBy = $param['order'][0]['column'];
+                                $sortDir = $param['order'][0]['dir'];
+                                $filter = isset($param['filter']) ? $param['filter'] : array();
+                        }
+                        
+			$model = new $this->_defaultModel;
+			$get = $model->getDataStock($filter, $limit, $offset, $sortBy, $sortDir);
+                        
+                         if ( ! Input::has('export') )
+			{
+				echo $this->parseDataCard($get,$offset,$draw);
+			}
+			else{
+				$export = isset($param['export']) ? $param['export'] : null;
+				return $this->parseDataCard($get,$offset,$draw,$export);
+			}
+			
+			
+            
+            
+        }
+        
+          public function getDataTambahan(){
+            
+            if(Request::ajax()){
+                $id_item = $_POST['id_item'];
+                $id_warehouse = $_POST['id_warehouse'];
+                $model = new $this->_defaultModel;
+                
+                $get = $model->getDataTambahan($id_item,$id_warehouse);
+                $row = new stdClass();
+                $row->stock_initial = $row->stock_in = $row->stock_out = $row->remaining_stock = $row->balance = 0;
+                if($get != false){
+                    foreach ($get['tambahan'] as $r=>$key){
+
+                        $row->stock_initial += $key->stock_initial;
+                        $row->stock_in += $key->stock_in;
+                        $row->stock_out += $key->stock_out;
+                        $row->remaining_stock += ($key->stock_initial + $key->stock_in - $key->stock_out);
+                        $row->balance += (($key->stock_initial + $key->stock_in - $key->stock_out) * $key->cogs_price);
+
+                    }
+   
+                    $row->stock_initial = displayNumeric($row->stock_initial);
+                    $row->stock_in = displayNumeric($row->stock_in);
+                    $row->stock_out = displayNumeric($row->stock_out);
+                    $row->remaining_stock = displayNumeric($row->remaining_stock);
+                    $row->balance = displayNumeric($row->balance);
+                }   
+                
+                echo json_encode($row);
+            }
+           
+        }
+        
+        public function getDataTambahanPost($id_item,$id_warehouse){
+            
+                $id_item = $id_item;
+                $id_warehouse = $id_warehouse;
+                $model = new $this->_defaultModel;
+                
+                $get = $model->getDataTambahan($id_item,$id_warehouse);
+                $row = new stdClass();
+                $row->stock_initial = $row->stock_in = $row->stock_out = $row->remaining_stock = $row->balance = 0;
+                if($get != false){
+                    foreach ($get['tambahan'] as $r=>$key){
+
+                        $row->stock_initial += $key->stock_initial;
+                        $row->stock_in += $key->stock_in;
+                        $row->stock_out += $key->stock_out;
+                        $row->remaining_stock += ($key->stock_initial + $key->stock_in - $key->stock_out);
+                        $row->balance += (($key->stock_initial + $key->stock_in - $key->stock_out) * $key->cogs_price);
+
+                    }
+   
+                    $row->stock_initial = displayNumeric($row->stock_initial);
+                    $row->stock_in = displayNumeric($row->stock_in);
+                    $row->stock_out = displayNumeric($row->stock_out);
+                    $row->remaining_stock = displayNumeric($row->remaining_stock);
+                    $row->balance = displayNumeric($row->balance);
+                }   
+                
+                return json_encode($row);
+            
+           
+        }
+        
+        function parseData($content,$offset = 0,$draw = 0,$export = null)
+	{
+		$data = array();
+		$n = $offset + 1;
+
+	
+			foreach($content['data'] as $key=>$r)
+			{
+				if(!$export)
+				{
+					$row = $r;
+					
+					$row->id = $r->$content['id'];
+					unset($row->$content['id']);
+					$row->action = '';
+				}
+				else
+				{
+					$row = (object) array();
+				}
+				$row->no = $n;
+
+				if($export){
+                                    
+					$row->item_name = $r->item_name;
+                                }else{
+					$row->item_name_link = '<a href="'.URL::to('/').'/inventory/data/card/'.encode($row->id).'" class="show_detail">'.$r->item_name.'</a> ';
+                                        
+				}
+                                        $row->item_code = $r->item_code;
+				        $row->qty = displayNumeric($r->qty);
+                                        $row->min_stock = displayNumeric($r->min_stock);
+                                        $row->max_stock = displayNumeric($r->max_stock);
+
+				if($export)
+				{
+					$data[$key] = (array)$row;
+				}else{
+					$data[$key] = $row;
+                                }        
+
+				$n++;
+			}
+			
+
+		if($export)
+		{
+                   
+			return (empty($data)) ? array() : $data;
+		}
+		
+		$records["data"] = $content['data'];
+		$records["export"] 	= 	$data;
+		$records["draw"] = $draw;
+		$records["recordsTotal"] = $content['count'];
+		$records["recordsFiltered"] = $content['filter_count'];;
+		
+		return json_encode($records);
+	}
+        
+        function parseDataCard($content,$offset = 0,$draw = 0,$export = null)
+	{
+		$data = array();
+		$n = $offset + 1;
+
+	
+			foreach($content['data'] as $key=>$r)
+			{
+				if(!$export)
+				{
+					$row = $r;
+					
+					$row->id = $r->$content['id'];
+					unset($row->$content['id']);
+					$row->action = '';
+				}
+				else
+				{
+					$row = (object) array();
+				}
+				$row->no = $n;
+                                $row->trx_date = displayDate($r->trx_date);
+                                $row->trx_type = $r->trx_type;
+                                $row->trx_no = $r->trx_no;
+                                $row->capital_price = displayNumeric($r->capital_price);
+                                $row->stock_in = displayNumeric($r->stock_in);
+                                $row->stock_out = displayNumeric($r->stock_out);
+                                $row->remaining_stock = displayNumeric($r->remaining_stock);
+                                $row->balance = displayNumeric($r->balance);
+
+				if($export)
+				{
+					$data[$key] = (array)$row;
+				}else{
+					$data[$key] = $row;
+                                }        
+
+				$n++;
+			}
+                        
+                       
+			
+                        if($export){
+                             $tambahan_json = $this->getDataTambahanPost($_POST['id_item'], $_POST['id_warehouse']);
+                             $tambahan = json_decode($tambahan_json);
+                             
+				$data[] = array('Initial Stock','',$tambahan->stock_initial,'','','','','','');
+                                $data[] = array('Stock In','',$tambahan->stock_in,'','','','','','');
+                                $data[] = array('Stock Out','',$tambahan->stock_out,'','','','','','');
+                                $data[] = array('Remaining Stock','',$tambahan->remaining_stock,'','','','','','');
+                                $data[] = array('Balance','',$tambahan->balance,'','','','','','');
+                                
+                        }
+
+		if($export)
+		{
+                   
+			return (empty($data)) ? array() : $data;
+		}
+		
+		$records["data"] = $content['data'];
+		$records["export"] 	= 	$data;
+		$records["draw"] = $draw;
+		$records["recordsTotal"] = $content['count'];
+		$records["recordsFiltered"] = $content['filter_count'];;
+		
+		return json_encode($records);
+                
+	}
+}   

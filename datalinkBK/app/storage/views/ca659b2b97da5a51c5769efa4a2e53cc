@@ -1,0 +1,35 @@
+<?php $__env->startSection('css'); ?>
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="<?php echo URL::asset('/assets/admin/pages/css/error.css'); ?>" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('js'); ?>
+	<script>
+		jQuery(document).ready(function() {     
+			Metronic.init(); // init metronic core components
+			Layout.init(); // init current layout
+		});
+	</script>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('content'); ?>
+	<!-- BEGIN PAGE CONTENT-->
+	<div class="row">
+		<div class="col-md-12 page-404">
+			<div class="number">
+				 404
+			</div>
+			<div class="details">
+				<h3>Oops! You're lost.</h3>
+				<p>
+					We can not find the page you're looking for.<br/>
+					Return <a href="<?php echo URL::to('/'); ?>/home">home</a>
+				</p>
+			</div>
+		</div>
+	</div>
+	<!-- END PAGE CONTENT-->
+<?php $__env->stopSection(); ?>
+
+<?php echo $__env->make('layouts.admin.default', array_except(get_defined_vars(), array('__data', '__path')))->render(); ?>

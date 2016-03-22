@@ -1,0 +1,176 @@
+<?php
+
+class PurchaseOrderController extends BaseController {
+
+    protected $_defaultModel = 'PurchaseOrderModel';
+    protected $_pageTitle = 'Purchase Order';
+    protected $_menuId = 'purchase-order';
+
+    public function __construct() {
+        
+    }
+
+    public function index() {
+        $getVendors = GeneralModel::getSelectionList('m_vendor', 'id_vendor', 'vendor_name');
+
+        $param = array(
+            'title' => $this->_pageTitle,
+            'title_desc' => 'Purchase Order',
+            'menu_id' => $this->_menuId,
+            'list_status' => array('' => '-- All --') + Config::get('globalvar.invoice_status'),
+            'listVendors' => array('' => '-- All --') + $getVendors,
+            'listPurchases' => GeneralModel::customGetSelectionList('t_purchase_request', 'id_pr', 'pr_no', 'PR-'),
+        );
+
+        return View::make('modules.purchase_order.index')->with($param);
+    }
+
+    public function getData() {
+        if (Request::ajax()) {
+            $privi['edit'] = hasPrivilege($this->_menuId, 'edit');
+            $privi['delete'] = hasPrivilege($this->_menuId, 'delete');
+
+            $param = Input::all();
+
+            $iDisplayLength = intval($param['length']);
+            $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength;
+            $offset = intval($param['start']);
+            $draw = intval($param['draw']);
+            $sortBy = $param['order'][0]['column'];
+            $sortDir = $param['order'][0]['dir'];
+            $filter = isset($param['filter']) ? $param['filter'] : array();
+
+            $model = new $this->_defaultModel;
+            $get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+
+            $data = array();
+            $n = $offset + 1;
+
+            $statusLabel = array(
+                0 => 'info',
+                1 => 'danger',
+                2 => 'warning',
+                3 => 'success'
+            );
+
+            foreach ($get['data'] as $key => $r) {
+                $row = $r;
+
+                $row->id = $r->$get['id'];
+                unset($row->$get['id']);
+
+                $row->no_faktur_link = '<a href="' . URL::to('/') . '/sales/invoice/detail/' . encode($row->id) . '" class="show_detail">' . $r->no_faktur . '</a> ';
+                $row->tanggal = displayDate($r->tanggal);
+                $row->total = displayNumeric($r->total);
+                $row->jatuh_tempo = displayDate($r->jatuh_tempo);
+                $row->status_view = '<span class="label label-' . $statusLabel[$r->status] . '">' . $r->status_desc . '</span> ';
+
+                $ubah = $hapus = '';
+                if ($privi['edit'])
+                    $ubah = '<a href="javascript:;" class="btn btn-xs purple tooltips show_edit" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+                if ($privi['delete'] && $r->status == 0) // hanya yang berstatus Draft
+                    $hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Batal"><i class="fa fa-trash-o"></i></a> ';
+
+                $row->action = '<div>' . $ubah . $hapus . '</div>';
+                $row->no = $n;
+
+                $data[$key] = $row;
+
+                $n++;
+            }
+
+            $records["data"] = $get['data'];
+            $records["draw"] = $draw;
+            $records["recordsTotal"] = $get['count'];
+            $records["recordsFiltered"] = $get['filter_count'];
+            ;
+
+            echo json_encode($records);
+        }
+    }
+
+    public function getDataSelect() {
+        if (Request::ajax()) {
+
+            $term = Input::get('term');
+            $cust_id = Input::get('cust_id');
+
+            $model = new $this->_defaultModel;
+            $get = $model->getDataSelect($term, $cust_id);
+
+            $data = array();
+
+            foreach ($get['data'] as $key => $r) {
+                $row = $r;
+
+                $row->tanggal = displayDate($r->tanggal);
+                $row->total_view = displayNumeric($r->sisa_bayar);
+
+                $data[] = $row;
+            }
+
+            echo json_encode($data);
+        }
+    }
+
+    public function getRow() {
+        if (Request::ajax()) {
+
+            $id = intval(Input::get('id'));
+
+            $model = new $this->_defaultModel;
+            $data = $model->getRow($id);
+
+            echo json_encode($data);
+        }
+    }
+
+    public function showDetail($id_trx) {
+        $id_trx = decode($id_trx);
+
+        $model = new $this->_defaultModel;
+        $data = $model->getDetailInvoice($id_trx);
+
+        if ($data) {
+            $statusLabel = array(
+                0 => 'info',
+                1 => 'danger',
+                2 => 'warning',
+                3 => 'success'
+            );
+            $statusDesc = Config::get('globalvar.invoice_status');
+            $data['status_label'] = $statusLabel[$data['status']];
+            $data['status_desc'] = $statusDesc[$data['status']];
+            $data['print'] = generatePrintInvoice($data, 'detail');
+
+            $param = array(
+                'title' => 'Detail Faktur',
+                'title_desc' => 'detail faktur penjualan',
+                'menu_id' => $this->_menuId,
+            );
+
+            $param = array_merge($param, $data);
+
+            return View::make('frontend.sales_invoice.detail')->with($param);
+        } else {
+            $param = array(
+                'title' => 'Page 404',
+                'menu_id' => 'missing'
+            );
+            return Response::view('errors.missing_admin', $param, 404);
+        }
+    }
+
+    public function doCancel() {
+        $id = intval(Input::get('id'));
+        $model = new $this->_defaultModel;
+        $del = $model->cancelData($id);
+        $ret = array(
+            'status' => $del,
+            'alert_msg' => $del ? 'Data berhasil dibatalkan.' : 'Data gagal dibatalkan. Silakan hubungi Customer Support.',
+            'error_msg' => array()
+        );
+        echo json_encode($ret);
+    }
+
+}

@@ -1,0 +1,198 @@
+@extends('layouts.admin.default')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/scripts/datatable.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js') }}"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+	
+	function construct() {
+
+		/* BEGIN DATA TABLE */
+		var grid = new Datatable();
+
+				grid.init({
+					src: $("#datatable"),
+					onSuccess: function (grid) {
+						// execute some code after table records loaded
+					},
+					onError: function (grid) {
+						// execute some code on network or other general error  
+					},
+					dataTable: { // here you can define a typical datatable settings from http://datatables.net/usage/options 
+						"ajax": {
+							"url": "{{ URL::to('/') }}/user_group/get_data", // ajax source
+						},
+						"order": [
+							[1, "asc"]
+						], // set first column as a default sort by asc
+						"columns": [
+							{ data: 'no', className: "alignCenter" },
+							{ data: 'group_name_link' },
+							{ data: 'description' },
+							{ data: 'action', bSortable: false, className: "alignCenter" }
+						]
+					}
+				});
+		/* END DATA TABLE */
+	
+		/* BEGIN EVENT HANDLER */
+		
+		// tombol delete
+		$("#datatable tbody").on('click', "a.do_delete", function(){
+					
+			var oTable = grid.getDataTable();
+			saveDelete(oTable.row($(this).parents('tr')).data().id);
+		});
+		
+		/* END EVENT HANDLER */
+		
+		/* BEGIN JS FUNCTION */
+		
+		function saveDelete(id)
+		{			
+			bootbox.confirm("Are you sure want to delete this data?", function(result) {
+			   if(result)
+			   {
+					$.ajax({
+						url: "{{ URL::to('/') }}/user_group/delete",
+						type:"post",
+						data: 'id='+id,
+						beforeSend:function(){
+							Metronic.blockUI();
+						},
+						success:function(result){
+							var result = eval('('+result+')');
+							Metronic.unblockUI();
+							// alert(result);
+							if(result.status)
+							{
+								toastr['success'](result.alert_msg);
+								
+								// Refresh table
+								var oTable = grid.getDataTable();
+								oTable.draw();
+							}
+							else
+							{
+								toastr['error'](result.alert_msg);
+							}
+						},
+						error:function(x,h,r)
+						{
+							alert(r);
+						}
+					})
+			   }
+			}); 
+		}
+		
+		/* END JS FUNCTION */
+
+	};
+		
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		
+		@if(Session::get('alert')=='success')
+			toastr['success']('{{ Session::get("alert_msg") }}');
+		@endif
+	});
+	</script>
+@stop
+
+@section('content')
+	<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			{{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">User Management</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">User Group</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<!-- BEGIN PAGE CONTENT-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- Begin: life time stats -->
+			<div class="portlet">
+				@if(hasPrivilege('user_group','new'))
+				<div class="portlet-title">
+					<div class="btn-group">
+						<a href="{{ URL::to('/') }}/user_group/new" class="btn btn green filter-submit tooltips" data-original-title="Create New" id="add"><i class="fa fa-plus"></i></a>
+					</div>
+				</div>
+				@endif
+			<div class="portlet-body">
+					<div class="table-container">
+						<table class="table table-striped table-bordered table-hover" id="datatable">
+						<thead>
+						<tr role="row" class="heading">
+							<th width="5%">
+								#
+							</th>
+							<th width="30%">
+								 Group Name
+							</th>
+							<th width="55%">
+								 Description
+							</th>
+							<th width="10%">
+								 Actions
+							</th>
+						</tr>
+						<tr role="row" class="filter">
+							<td>
+							</td>
+							<td>
+								<input type="text" class="form-control form-filter input-sm" name="filter[group_name]">
+							</td>
+							<td>
+								<input type="text" class="form-control form-filter input-sm" name="filter[description]">
+							</td>
+							<td>
+								<center>
+									<button class="btn btn-sm yellow filter-submit tooltips" data-original-title="Cari"><i class="fa fa-search"></i> </button>
+									<button class="btn btn-sm red filter-cancel tooltips" data-original-title="Reset"><i class="fa fa-times"></i> </button>
+								</center>
+							</td>
+						</tr>
+						</thead>
+						<tbody>
+						</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<!-- End: life time stats -->
+		</div>
+	</div>
+	
+	<!-- END PAGE CONTENT-->
+@stop

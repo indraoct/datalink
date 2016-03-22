@@ -1,0 +1,303 @@
+<?php
+
+class StockOpnameModel{
+    
+    protected $_table = 't_stock_opname';
+    protected $_id = 'id_trx';
+    
+    protected $_table_detail = 't_stock_opname_detail';
+    protected $_id_detail = 'id_detail';
+    
+    protected $_table_stock = 't_item_stock';
+    protected $_id_stock = 'id_stock';
+    
+    protected $_table_item = 'm_item';
+    protected $_id_item  = 'id_item';
+    
+    protected $_table_warehouse = 'm_warehouse';
+    protected $_id_warehouse = 'id_warehouse';
+
+
+
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note'))
+                                                        ->leftJoin($this->_table_detail,$this->_table_detail.'.id_trx','=',$this->_table.'.id_trx')
+                                                        ->leftJoin('m_warehouse','m_warehouse.id_warehouse','=',$this->_table_detail.'.id_warehouse')
+                                                        ->where($this->_table.'.is_deleted',0)
+                                                        ->where($this->_table.'.owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['trx_no'] != "")
+				$query->where('trx_no', 'LIKE', '%'.$filter['trx_no'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',  defaultDate($filter['date_from']));
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',defaultDate($filter['date_to']));
+                        
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+     
+     
+     public function getDataSelect($term,$item_code)
+	{		
+		$query = DB::table($this->_table_item)
+						->select(array($this->_id_item.' as id','item_code','item_name'))
+						->where('is_deleted',0)
+                                                ->where('is_stockable',1)
+						->where('owner', Crypt::decrypt(Session::get('owner')))
+                                                ->where('item_name', 'LIKE', '%'.$term.'%');
+						//->where('item_code',$item_code);
+		
+		$data['data'] = $query->orderBy('id_item')->take(100)->get();
+		
+		return $data;
+	}
+        
+     
+     public function getWarehouseSelect($term,$id_warehouse)
+	{		
+		$query = DB::table($this->_table_warehouse)
+						->select(array($this->_id_warehouse.' as id','id_warehouse','warehouse_name'))
+						->where('is_deleted',0)
+						->where('owner', Crypt::decrypt(Session::get('owner')))
+                                                ->where('warehouse_name', 'LIKE', '%'.$term.'%');
+		
+		$data['data'] = $query->orderBy('id_warehouse')->take(100)->get();
+		
+		return $data;
+	}
+        
+      public function getQty($id_warehouse,$id_item){
+          
+          $query = DB::table($this->_table_stock." as a")
+                                                               ->select(array($this->_id_stock, 
+                                                                              DB::raw('SUM(a.stock_initial + a.stock_in - a.stock_out) AS qty'),))
+                                                               ->leftJoin('m_item as b', 'a.id_item', '=', 'b.id_item')
+                                                               ->leftJoin('m_warehouse as c', 'a.id_warehouse', '=', 'c.id_warehouse')
+                                                               ->where('a.id_item',$id_item)
+                                                               ->where('a.id_warehouse',$id_warehouse)
+                                                               ->where('a.is_deleted',0)
+                                                               ->where('a.owner', Crypt::decrypt(Session::get('owner')))
+                                                               ->groupBy('a.id_item');
+          $data['data'] = $query->get();
+          
+          return $data;
+      }  
+     
+     public function getRow($id){
+        
+                     
+                     
+                 $query = DB::table($this->_table_item." as a")
+                                                        ->select(array('a.'.$this->_id_item." as id",'a.item_name','a.item_code','a.id_item'))
+                                                        ->where('a.is_deleted',0)
+                                                        ->where('a.is_stockable',1)
+                                                        ->where('a.id_item',$id)
+                                                        ->where('a.owner', Crypt::decrypt(Session::get('owner')))
+                                                        ->groupBy('a.id_item');
+                    
+		
+		return $query->first();
+        
+        
+     }
+     
+     /*
+      * Insert Data Opname
+      */
+     public function insertDataOpname($data)
+	{
+		$owner = Crypt::decrypt(Session::get('owner'));
+		
+		$trx_no = GeneralModel::getTrxNo('t_stock_opname', 'trx_no'); 	
+		$trx_date = defaultDate($data['trx_date']);
+                $no_ref  = $data['ref_no'];
+                $note    = $data['note'];
+		
+	
+        $insertTrx = array(
+
+            'owner' 				=> $owner,
+            'trx_no'				=> $trx_no,
+            'trx_date'				=> $trx_date,
+            'no_ref'				=> $no_ref,
+            'note'				=> $note,
+            'created_by' 			=> Session::get('user_name'),
+            'created_at'			=> DB::raw('now()')
+
+        );
+       
+        $id_trx = DB::table('t_stock_opname')->insertGetId($insertTrx);
+	
+        $paramStokAkun = array(
+
+            'owner' 		=> $owner,
+            'kode_trx'	=> 'SI',
+            'id_ref'			=> $id_trx,
+            'no_ref'		=> $no_faktur,
+            'tanggal'		=> $tanggal,
+            'notes' 		=> 'POS',
+
+        );
+		
+		$insertTrxDetail = $paramStokDetail = array();
+		foreach($data['produk'] as $p)
+		{
+			$harga_satuan = defaultNumeric($p['harga_satuan']);
+			$harga_beli = defaultNumeric($p['harga_beli']);
+			$untung = $harga_satuan - $harga_beli;
+			
+			$insertTrxDetail[] = array(
+			
+				'id_trx'						=> $id_trx,
+				'id_cabang'				=> null,
+				'id_produk'				=> $p['id_produk'],
+				'kode_produk'			=> $p['kode_produk'],
+				'nama_produk'			=> $p['nama_produk'],
+				'harga_jual'				=> defaultNumeric($p['harga_jual']),
+				'harga_satuan'			=> $harga_satuan,
+				'harga_beli'				=> $harga_beli,
+				'untung'					=> $untung,
+				'tipe_diskon'			=> $p['tipe_diskon'],
+				'diskon'					=> defaultNumeric($p['diskon']),
+				'potongan_harga'	=> defaultNumeric($p['diskon_item']),
+				'qty'							=> defaultNumeric($p['qty']),
+				'satuan'					=> $p['satuan'],
+				'total_item'				=> defaultNumeric($p['total_item']),
+				
+			);
+			
+			$paramStokDetail[] = array(
+			
+				'id_cabang'				=> null,
+				'id_produk'				=> $p['id_produk'],
+				'stok_out'					=> defaultNumeric($p['qty']),
+				
+			);
+		}
+		
+		DB::table('t_trx_jual_detail')->insert($insertTrxDetail);
+		
+		$stok = new Stok($owner);
+		$stok->createTrx($paramStokAkun,$paramStokDetail);
+		
+	}
+
+        /*
+         * Insert Data Stock
+         */
+	public function insertDataStock($data)
+	{
+		$owner = Crypt::decrypt(Session::get('owner'));
+		
+		if($data['action']=='process')
+		{
+			$status = 1;
+			$no_draft = null;
+			if($data['no_isauto'])
+				$no_faktur = self::getNoInvoice();
+			else
+				$no_faktur = $data['no_faktur'];
+		}
+		else
+		{
+			$status = 0;
+			$no_faktur = null;
+			$no_draft = self::getNoDraft();
+		}
+
+		
+		$tanggal = defaultDate($data['tanggal']);
+		$total_bruto = defaultNumeric($data['total_bruto']);
+		$total_netto = defaultNumeric($data['total_netto']);
+		$hpp = defaultNumeric($data['hpp']);
+		$potongan_harga = $total_bruto - $total_netto;
+		$untung = $total_netto - $hpp;
+	
+        $insertTrx = array(
+
+            'owner' 					=> $owner,
+            'no_faktur'					=> $no_faktur,
+            'tanggal'					=> $tanggal,
+            'created_by' 				=> Session::get('user_name'),
+            'created_at'				=> DB::raw('now()')
+
+        );
+       
+        $id_trx = DB::table('t_trx_stock')->insertGetId($insertTrx);
+	
+        $paramStokAkun = array(
+
+            'owner' 		=> $owner,
+            'kode_trx'	=> 'SI',
+            'id_ref'			=> $id_trx,
+            'no_ref'		=> $no_faktur,
+            'tanggal'		=> $tanggal,
+            'notes' 		=> 'Faktur Penjualan',
+
+        );
+		
+		$insertTrxDetail = $paramStokDetail = array();
+		foreach($data['produk'] as $p)
+		{
+			$harga_satuan = defaultNumeric($p['harga_satuan']);
+			$harga_beli = defaultNumeric($p['harga_beli']);
+			$untung = $harga_satuan - $harga_beli;
+			
+			$insertTrxDetail[] = array(
+			
+				'id_trx'						=> $id_trx,
+				'id_cabang'				=> null,
+				'id_produk'				=> $p['id_produk'],
+				'kode_produk'			=> $p['kode_produk'],
+				'nama_produk'			=> $p['nama_produk'],
+				'harga_jual'				=> defaultNumeric($p['harga_jual']),
+				'harga_satuan'			=> $harga_satuan,
+				'harga_beli'				=> $harga_beli,
+				'untung'					=> $untung,
+				'tipe_diskon'			=> $p['tipe_diskon'],
+				'diskon'					=> defaultNumeric($p['diskon']),
+				'potongan_harga'	=> defaultNumeric($p['diskon_item']),
+				'qty'							=> defaultNumeric($p['qty']),
+				'satuan'					=> $p['satuan'],
+				'total_item'				=> defaultNumeric($p['total_item']),
+				
+			);
+			
+			$paramStokDetail[] = array(
+			
+				'id_cabang'				=> null,
+				'id_produk'				=> $p['id_produk'],
+				'stok_out'					=> defaultNumeric($p['qty']),
+				
+			);
+		}
+		
+		DB::table('t_trx_jual_detail')->insert($insertTrxDetail);
+
+			$stok = new Stok($owner);
+			$stok->createTrx($paramStokAkun,$paramStokDetail);
+		
+		
+		return $id_trx;
+	}
+     
+     
+}

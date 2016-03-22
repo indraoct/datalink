@@ -1,0 +1,221 @@
+@extends('layouts.global')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/global/plugins/select2/select2.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/global/plugins/select2/select2-metronic.css') }}" rel="stylesheet" type="text/css"/>
+	<link href="{{ URL::asset('/assets/admin/pages/css/login.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script src="{{ URL::asset('/assets/global/plugins/jquery-validation/js/jquery.validate.min.js') }}" type="text/javascript"></script>
+	<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/select2/select2.min.js') }}"></script>
+	<script src="{{ URL::asset('/assets/admin/pages/scripts/login.js') }}" type="text/javascript"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+	<script>
+			jQuery(document).ready(function() {     
+				Metronic.init(); // init metronic core components
+				Layout.init(); // init current layout
+				Login.init();
+				
+				if($(location).attr('hash')=='#daftar')
+				{
+					jQuery('.login-form').hide();
+					jQuery('.register-form').show();
+				}
+			});
+	</script>
+@stop
+
+@section('content')
+	<!-- BEGIN LOGO -->
+	<div class="logo">
+		<a href="index.html">
+		<img src="{{ URL::asset('/assets/admin/layout/img/logo-big.png') }}" alt=""/>
+		</a>
+	</div>
+	<!-- END LOGO -->
+	<!-- BEGIN SIDEBAR TOGGLER BUTTON -->
+	<div class="menu-toggler sidebar-toggler">
+	</div>
+	<!-- END SIDEBAR TOGGLER BUTTON -->
+	<!-- BEGIN LOGIN -->
+	<div class="content">
+		<!-- BEGIN LOGIN FORM -->
+		<form class="login-form" action="" method="post">
+			<h3 class="form-title">Login</h3>
+			<div class="alert alert-danger display-hide" id="empty">
+				<button class="close" data-close="alert"></button>
+				<span>
+				Harap masukkan username dan password. </span>
+			</div>
+			@if (Session::has('error'))
+				<div class="alert alert-danger" id="invalid">
+					<button class="close" data-close="alert"></button>
+					<span>
+					{{ Session::get('error') }} </span>
+				</div>
+			@endif
+			<div class="form-group">
+				<!--ie8, ie9 does not support html5 placeholder, so we just show field title for that-->
+				<label class="control-label visible-ie8 visible-ie9">Username</label>
+				<div class="input-icon">
+					<i class="fa fa-user"></i>
+					<input class="form-control placeholder-no-fix" type="text" autocomplete="off" placeholder="Username" name="username" value="{{ Input::old('username') }}"/>
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Password</label>
+				<div class="input-icon">
+					<i class="fa fa-lock"></i>
+					<input class="form-control placeholder-no-fix" type="password" autocomplete="off" placeholder="Password" name="password"/>
+				</div>
+			</div>
+			<div class="form-actions">
+				<label class="checkbox">
+				<input type="checkbox" name="remember" value="1"/> Remember me </label>
+				<button type="submit" class="btn green pull-right">
+				Login <i class="m-icon-swapright m-icon-white"></i>
+				</button>
+			</div>
+			<div class="forget-password">
+				<h4>Lupa password ?</h4>
+				<p>
+					 Jangan khawatir, klik <a href="javascript:;" id="forget-password">
+					di sini </a>
+					untuk me-reset password.
+				</p>
+			</div>
+			<div class="create-account">
+				<p>
+					 Belum memiliki akun ?&nbsp; <a href="javascript:;" id="register-btn">
+					Daftar </a>
+				</p>
+			</div>
+		</form>
+		<!-- END LOGIN FORM -->
+		<!-- BEGIN FORGOT PASSWORD FORM -->
+		<form class="forget-form" action="index.html" method="post">
+			<h3>Lupa Password ?</h3>
+			<p>
+				 Masukkan alamat e-mail di bawah untuk me-reset password.
+			</p>
+			<div class="form-group">
+				<div class="input-icon">
+					<i class="fa fa-envelope"></i>
+					<input class="form-control placeholder-no-fix" type="text" autocomplete="off" placeholder="Email" name="email"/>
+				</div>
+			</div>
+			<div class="form-actions">
+				<button type="button" id="back-btn" class="btn">
+				<i class="m-icon-swapleft"></i> Back </button>
+				<button type="submit" class="btn green pull-right">
+				Submit <i class="m-icon-swapright m-icon-white"></i>
+				</button>
+			</div>
+		</form>
+		<!-- END FORGOT PASSWORD FORM -->
+		<!-- BEGIN REGISTRATION FORM -->
+		<form class="register-form" action="signup" method="post">
+			<h3>Daftar</h3>
+			<p>
+				 Masukkan data di bawah ini
+			</p>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Nama Lengkap</label>
+				<div class="input-icon">
+					<i class="fa fa-font"></i>
+					<input class="form-control placeholder-no-fix" type="text" placeholder="Nama Lengkap" name="fullname"/>
+				</div>
+			</div>
+			<!--
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Full Name</label>
+				<div class="row">
+					<div class="col-md-6">
+						<div class="input-icon">
+							<i class="fa fa-font"></i>
+							<input class="form-control placeholder-no-fix" type="text" placeholder="First Name" name="firstname"/>
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="input-icon">
+							<i class="fa fa-font"></i>
+							<input class="form-control placeholder-no-fix" type="text" placeholder="Last Name" name="lastname"/>
+						</div>
+					</div>
+				</div>
+			</div>
+			-->
+			<div class="form-group">
+				<!--ie8, ie9 does not support html5 placeholder, so we just show field title for that-->
+				<label class="control-label visible-ie8 visible-ie9">Email</label>
+				<div class="input-icon">
+					<i class="fa fa-envelope"></i>
+					<input class="form-control placeholder-no-fix" type="text" placeholder="Email" name="email"/>
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Alamat</label>
+				<div class="input-icon">
+					<i class="fa fa-check"></i>
+					<input class="form-control placeholder-no-fix" type="text" placeholder="Alamat" name="address"/>
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Kota/Kabupaten</label>
+				<div class="input-icon">
+					<i class="fa fa-location-arrow"></i>
+					<input class="form-control placeholder-no-fix" type="text" placeholder="Kota/Kabupaten" name="city"/>
+				</div>
+			</div>
+			<p>
+				 Masukkan akun detail di bawah:
+			</p>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Username</label>
+				<div class="input-icon">
+					<i class="fa fa-user"></i>
+					<input class="form-control placeholder-no-fix" type="text" autocomplete="off" placeholder="Username" name="username"/>
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Password</label>
+				<div class="input-icon">
+					<i class="fa fa-lock"></i>
+					<input class="form-control placeholder-no-fix" type="password" autocomplete="off" id="register_password" placeholder="Password" name="password"/>
+				</div>
+			</div>
+			<div class="form-group">
+				<label class="control-label visible-ie8 visible-ie9">Ketik Ulang Password</label>
+				<div class="controls">
+					<div class="input-icon">
+						<i class="fa fa-check"></i>
+						<input class="form-control placeholder-no-fix" type="password" autocomplete="off" placeholder="Ketik Ulang Password" name="rpassword"/>
+					</div>
+				</div>
+			</div>
+			<div class="form-group">
+				<label>
+				<input type="checkbox" name="tnc"/> I agree to the <a href="#">
+				Terms of Service </a>
+				and <a href="#">
+				Privacy Policy </a>
+				</label>
+				<div id="register_tnc_error">
+				</div>
+			</div>
+			<div class="form-actions">
+				<button id="register-back-btn" type="button" class="btn">
+				<i class="m-icon-swapleft"></i> Back </button>
+				<button type="submit" id="register-submit-btn" class="btn green pull-right">
+				Sign Up <i class="m-icon-swapright m-icon-white"></i>
+				</button>
+			</div>
+		</form>
+		<!-- END REGISTRATION FORM -->
+	</div>
+	<!-- END LOGIN -->
+@stop

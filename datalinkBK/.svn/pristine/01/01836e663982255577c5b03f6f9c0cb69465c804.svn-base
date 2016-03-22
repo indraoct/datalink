@@ -1,0 +1,326 @@
+<?php
+// My common functions
+function simpleArray($array,$valCol)
+{
+	$data = array();
+	foreach($array as $row)
+	{
+		$data[] = $row[$valCol];
+	}
+	
+	return $data;
+}
+
+function listArray($array,$keyCol,$valCol)
+{
+	$data = array();
+	foreach($array as $row)
+	{
+		$data[$row->$keyCol] = $row->$valCol;
+	}
+	
+	return $data;
+}
+	
+function autoNumeric()
+{
+	if(Config::get('format.currency') == 'id')
+		return "{vMin:'-999999999999.99', vMax:'999999999999.99', aSep:'.', aDec:',' }";
+	else
+		return "{vMin:'-999999999999.99', vMax:'999999999999.99', aSep:',', aDec:'.' }";
+}
+	
+function numericJS()
+{
+	if(Config::get('format.currency') == 'id')
+		return "'.',','";
+	else
+		return "',','.'";
+}
+	
+function displayNumeric($num)
+{
+	if($num != null || $num !='')
+	{
+		if(Config::get('format.currency') == 'id')
+			return number_format($num,2,",",".");
+		else
+			return number_format($num,2,".",",");
+	}
+	else
+		return $num;
+}
+	
+function printNumeric($num)
+{
+	if($num != null || $num !='')
+	{
+		if(Config::get('format.currency') == 'id')
+		{
+			if (fmod($num, 1) == 0) // $number DOES NOT have a significant decimal part
+				return number_format($num,0,",",".");
+			else
+				return number_format($num,2,",",".");
+		}
+		else
+		{
+			if (fmod($num, 1) == 0) // $number DOES NOT have a significant decimal part
+				return number_format($num,0,".",",");
+			else
+				return number_format($num,2,".",",");
+		}
+	}
+	else
+		return $num;
+}
+	
+function defaultNumeric($num)
+{
+	if($num != null || $num !='')
+	{
+		if(Config::get('format.currency') == 'id')
+			return str_replace(array('.',','),array('','.'),$num);
+		else
+			return str_replace(',','',$num);
+	}
+	else
+		return $num;
+}
+	
+function displayDate($date)
+{
+	if($date != null || $date !='')
+	{
+		$date = DateTime::createFromFormat('Y-m-d', $date);
+		return $date->format(Config::get('format.date.php'));
+	}
+	else
+		return $date;
+}
+	
+function displayDateTime($datetime)
+{
+	if($datetime != null || $datetime !='')
+	{
+		$datetime = DateTime::createFromFormat('Y-m-d H:i:s', $datetime);
+		return $datetime->format(Config::get('format.datetime.php'));
+	}
+	else
+		return $datetime;
+}
+	
+function defaultDate($date)
+{
+	if($date != null || $date !='')
+	{
+		$date = DateTime::createFromFormat(Config::get('format.date.php'), $date);
+		return $date->format('Y-m-d');
+	}
+	else
+		return $date;
+}
+
+function encode($string) 
+{
+	$key = Config::get('globalvar.encode_key');
+	$key = sha1($key);
+	$strLen = strlen($string);
+	$keyLen = strlen($key);
+	$j = 0;
+	$hash = '';
+	for ($i = 0; $i < $strLen; $i++) 
+	{
+		$ordStr = ord(substr($string,$i,1));
+		if ($j == $keyLen) { $j = 0; }
+		$ordKey = ord(substr($key,$j,1));
+		$j++;
+		$hash .= strrev(base_convert(dechex($ordStr + $ordKey),16,36));
+	}
+	return $hash;
+}
+
+function decode($string) 
+{
+	$key = Config::get('globalvar.encode_key');
+	$key = sha1($key);
+	$strLen = strlen($string);
+	$keyLen = strlen($key);
+	$j = 0;
+	$hash = '';
+	for ($i = 0; $i < $strLen; $i+=2) 
+	{
+		$ordStr = hexdec(base_convert(strrev(substr($string,$i,2)),36,16));
+		if ($j == $keyLen) { $j = 0; }
+		$ordKey = ord(substr($key,$j,1));
+		$j++;
+		$hash .= chr($ordStr - $ordKey);
+	}
+	return $hash;
+}
+
+function toArray($param)
+{
+	return json_decode(json_encode($param), true);
+}
+
+function hasPrivilege($code,$action)
+{
+	$privi = Session::get('user_privi');
+	if(isset($privi[$code][$action]))
+		if($privi[$code][$action])
+			return true;
+	
+	return false;
+}
+
+function spellNumeric($n) 
+{
+	$dasar = array(1 => 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam','tujuh', 'delapan', 'sembilan');
+	$angka = array(1000000000, 1000000, 1000, 100, 10, 1);
+	$satuan = array('milyar', 'juta', 'ribu', 'ratus', 'puluh', '');
+	$str="";
+	$i = 0;
+	if($n==0){
+		   $str = "nol";
+	}else{
+		  while ($n != 0) {
+			  $count = (int)($n/$angka[$i]);
+			  if ($count >= 10) {
+				  $str .= spellNumeric($count). " ".$satuan[$i]." ";
+			  }else if($count > 0 && $count < 10){
+				  $str .= $dasar[$count] . " ".$satuan[$i]." ";
+			  }
+			  $n -= $angka[$i] * $count;
+			  $i++;
+		   }
+		   $str = preg_replace("/satu puluh (\w+)/i", "\\1 belas", $str);
+		   $str = preg_replace("/satu (ribu|ratus|puluh|belas)/i", "se\\1", $str);
+	}
+	return $str;
+}
+    
+function generatePrintInvoice($data,$tipe)
+{
+	$i=1;
+	$rowPerPage = 12;
+	$kepada = $nama_customer = $alamat = '';
+	if(Config::get('format.currency') == 'id')
+		$aDec = ',';
+	else
+		$aDec = '.';
+
+	if($data['id_customer']>0)
+	{
+		$kepada = 'Kepada Yth :';
+		$nama_customer = $data['nama_customer'];
+		$alamat = substr(preg_replace( "#\r\n|\n|\r#", ' ', $data['alamat_penagihan']),0,35); 
+	}
+	
+	if($tipe == 'pos')
+		$tanggal = $data['tanggal'];
+	else
+		$tanggal = displayDate($data['tanggal']);
+	
+	$print = 	substr(str_pad('Senang Setuju',45,' '),0,45).'Jakarta, '.$tanggal.'\n'.
+					substr(str_pad('Pinangsia',45,' '),0,45).$kepada.'\n'.
+					substr(str_pad('(021) 12345678',45,' '),0,45).$nama_customer.'\n'.
+					str_pad('',45,' ').$alamat.'\n'.
+					str_pad('INVOICE NO : '.$data['no_faktur'],80,' ').'\n'.
+					str_pad('',80,'=',STR_PAD_BOTH).'\n'.
+					
+					' NO | '.str_pad('NAMA PRODUK',36,' ',STR_PAD_BOTH).' |'.
+					' '.str_pad('QTY',6,' ',STR_PAD_BOTH).' |'.
+					' '.str_pad('HARGA @',10,' ',STR_PAD_BOTH).' |'.
+					' '.str_pad('JUMLAH',12,' ',STR_PAD_BOTH).'\n'.
+					
+					str_pad('',80,'-',STR_PAD_BOTH).'\n';
+			
+	foreach($data['produk'] as $row)
+	{
+		$qnama_produk = substr_count($row['nama_produk'], '"');
+		$nama_produk = str_replace('"', '\"', $row['nama_produk']);
+		
+		if($tipe == 'pos')
+		{
+			$qty = strstr($row['qty'], $aDec, true);
+			$harga_satuan = strstr($row['harga_satuan'], $aDec, true);
+			$total_item = strstr($row['total_item'], $aDec, true);
+		}
+		else
+		{
+			$qty = printNumeric($row['qty']);
+			$harga_satuan = printNumeric($row['harga_satuan']);
+			$total_item = printNumeric($row['total_item']);
+		}
+		
+		$print .= 	' '.str_pad($i,2," ",STR_PAD_LEFT).' |'.
+						' '.substr(str_pad($nama_produk,(36+$qnama_produk)," "),0,(36+$qnama_produk)).' |'.
+						' '.substr(str_pad($qty,6," ",STR_PAD_LEFT),0,6).' |'.
+						' '.substr(str_pad($harga_satuan,10," ",STR_PAD_LEFT),0,10).' |'.
+						' '.substr(str_pad($total_item,12," ",STR_PAD_LEFT),0,12).'\n';
+		
+		if($i % $rowPerPage == 0 && (count($data['produk'])%$rowPerPage!=0 || (count($data['produk'])%$rowPerPage==0 && $i!=count($data['produk']))))
+		{
+			$print .= 	str_pad("",80,"=",STR_PAD_BOTH).'\n'.
+							'\n\n\n\n\n\n\n\n\n\n\n\n';
+					
+			$print .= 	substr(str_pad('Senang Setuju',45,' '),0,45).'Jakarta, '.$tanggal.'\n'.
+							substr(str_pad('Pinangsia',45,' '),0,45).$kepada.'\n'.
+							substr(str_pad('(021) 12345678',45,' '),0,45).$nama_customer.'\n'.
+							str_pad('',45,' ').$alamat.'\n'.
+							str_pad('INVOICE NO : '.$data['no_faktur'],80,' ').'\n'.
+							str_pad('',80,'=',STR_PAD_BOTH).'\n'.
+							
+							' NO | '.str_pad('NAMA PRODUK',36,' ',STR_PAD_BOTH).' |'.
+							' '.str_pad('QTY',6,' ',STR_PAD_BOTH).' |'.
+							' '.str_pad('HARGA @',10,' ',STR_PAD_BOTH).' |'.
+							' '.str_pad('JUMLAH',12,' ',STR_PAD_BOTH).'\n'.
+							
+							str_pad('',80,'-',STR_PAD_BOTH).'\n';
+		}
+		$i++;
+	}
+		
+	$i--;
+	if($i%$rowPerPage!=0)
+	{
+		for($j=0 ;$j < $rowPerPage-($i%$rowPerPage);$j++)
+			$print .= 	' '.str_pad("",2," ").' | '.str_pad("",36," ").' | '.str_pad("",6," ").' | '.str_pad("",10," ").' | '.str_pad("",12," ").'\n';
+	}
+	
+	if($tipe == 'pos')
+	{
+		$sub_total = strstr($data['sub_total'], $aDec, true);
+		$total_diskon_global = strstr($data['total_diskon'], $aDec, true);
+		$total = strstr($data['total_netto'], $aDec, true);
+		$total_terbilang = defaultNumeric($data['total_netto']);
+	}
+	else
+	{
+		$sub_total = printNumeric($data['sub_total']);
+		$total_diskon_global = printNumeric($data['total_diskon_global']);
+		$biaya = printNumeric($data['biaya']);
+		$total = printNumeric($data['total']);
+		$total_terbilang = $data['total'];
+	}
+	
+	$terbilang = $total_terbilang ? strtoupper(spellNumeric(round($total_terbilang))."RUPIAH") : '' ;
+	
+	$print .=	str_pad("",80,"=",STR_PAD_BOTH).'\n'.
+					substr(str_pad($terbilang,80," "),0,80).'\n\n'.
+					str_pad(' Penerima,                  Hormat kami,',54," ").
+					'SUBTOTAL Rp. '.str_pad($sub_total,12," ",STR_PAD_LEFT).'\n'.
+					str_pad('',54," ").'DISKON   Rp. '.str_pad($total_diskon_global,12," ",STR_PAD_LEFT).'\n';
+	
+	if($data['id_customer']>0)
+		$print .=	str_pad('',54," ").'BIAYA    Rp. '.str_pad($biaya,12," ",STR_PAD_LEFT).'\n';
+		
+	$print .=	str_pad('',54," ").'TOTAL    Rp. '.str_pad($total,12," ",STR_PAD_LEFT).'\n\n\n\n\n\n\n';
+	
+	if($data['id_customer']==0)
+		$print .='\n';
+	
+	return $print;
+}
+
+?>

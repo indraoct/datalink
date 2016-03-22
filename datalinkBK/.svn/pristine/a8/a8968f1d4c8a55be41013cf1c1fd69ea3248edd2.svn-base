@@ -1,0 +1,49 @@
+<?php
+
+class StockOpnameModel{
+    
+    protected $_table = 't_stock_opname';
+    protected $_id = 'id_trx';
+    
+    protected $_table_detail = 't_stock_opname_detail';
+    protected $_id_detail = 'id_detail';
+
+
+
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir){
+        
+        $tableColumn = array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note','warehouse_name');
+                     $query = DB::table($this->_table)
+                                                        ->select(array($this->_table.'.'.$this->_id, 'trx_no','trx_date','note','warehouse_name'))
+                                                        ->leftJoin($this->_table_detail,$this->_table_detail.'.id_trx','=',$this->_table.'.id_trx')
+                                                        ->leftJoin('m_warehouse','m_warehouse.id_warehouse','=',$this->_table_detail.'.id_warehouse')
+                                                        ->where($this->_table.'.is_deleted',0)
+                                                        ->where($this->_table.'.owner', Crypt::decrypt(Session::get('owner')));
+                    
+                
+                       
+
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['trx_no'] != "")
+				$query->where('trx_no', 'LIKE', '%'.$filter['trx_no'].'%');
+			if($filter['date_from'] != "")
+                                $query->where('trx_date', '>=',  defaultDate($filter['date_from']));
+                        if($filter['date_to'] != "")
+                                $query->where('trx_date', '<=',defaultDate($filter['date_to']));
+                        if($filter['warehouse_name'] != "")
+                                $query->where('warehouse_name', '=',$filter['warehouse_name']);
+                       
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+        
+        
+     }
+}

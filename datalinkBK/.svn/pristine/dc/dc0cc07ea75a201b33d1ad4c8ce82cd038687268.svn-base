@@ -1,0 +1,106 @@
+<?php
+
+class PurchaseOrderModel {
+
+    protected $_table = 't_purchase_order';
+    protected $_table_detail = 't_purchase_order_detail';
+    protected $_id = 'id_trx';
+
+    public function getData($filter, $limit, $offset, $sortBy, $sortDir) {
+        $data['id'] = $this->_id;
+
+        $tableColumn = array($this->_id, 'po_no', 'vendor_name', 'total');
+
+        $subquery = DB::table($this->_table . ' AS a')
+                ->select(array('id_po', 'a.po_no', 'a.po_date', 'a.owner', 'a.id_vendor', 'vendor_name', 'a.created_at', 'total', 'a.status'))
+                ->leftJoin('m_vendor AS b', 'a.id_vendor', '=', 'b.id_vendor');
+
+        $query = DB::table(DB::raw("({$subquery->toSql()}) as t"));
+
+        $data['count'] = $data['filter_count'] = $query->count();
+
+        if ($filter) {
+            
+        }
+
+        $data['data'] = $query->orderBy($tableColumn[$sortBy], $sortDir)->orderBy('created_at', 'desc')->skip($offset)->take($limit)->get();
+
+        return $data;
+    }
+    
+    public function insertData($data) {
+        $owner = Crypt::decrypt(Session::get('owner'));
+        $dateObj = new DateTime($data['po_date']);
+        $fields = array (
+            'owner' => $owner,
+            'id_vendor' => $data['vendor'],
+            'po_no' => substr($data['po_no'], 3),
+            'po_date' => $dateObj->format('Y-m-d'),
+            'ref_no' => substr($data['pr_no'], 3),
+            'currency' => $data['currency'],
+            'tax' => (isset($data['tax']) && $data['tax']) ? 1 : 0,
+            'notes' => $data['notes'],
+            'subtotal' => defaultNumeric($data['subtotal']),
+            'discount' => defaultNumeric($data['global_disc']),
+            'discount_type' => $data['global_type_disc'],
+            'total_discount' => defaultNumeric($data['global_disc_total']),
+            //'tax_amount' => defaultNumeric($data['tax_amount']),
+            'total' => defaultNumeric($data['total']),
+            'status' => 1,
+            'created_by' => Session::get('user_name'),
+            'created_at' => DB::raw('NOW()')
+        );
+        
+        $id = DB::table('t_purchase_order')->insertGetId($fields);
+        $unitData = GeneralModel::getSelectionList2('m_item_unit', 'id_unit', 'unit_name');
+        foreach ($data['items'] as $key => $item) {
+            $items[] = array (
+                'id_po' => $id,
+                'id_detail_pr' => $data['pr_id'],
+                'id_item' => $item['id_item'],
+                'item_name' => $item['item_name'],
+                'qty' => $item['qty'],
+                'item_unit' => $unitData[$item['unit']],
+                'price' => defaultNumeric($item['price']),
+                'discount' => defaultNumeric($item['item_disc']),
+                'discount_type' => $item['discount_type'],
+                'subtotal' => defaultNumeric($item['total_item'])
+            );
+        }
+
+        DB::table('t_purchase_order_detail')->insert($items);
+
+        return $id;
+    }
+    
+    public function getDetail($id) {
+        $query = DB::table($this->_table)
+                ->where('id_po', $id);
+        $data = (array)$query->first();
+        
+        $itemsQuery = DB::table($this->_table_detail)
+                ->where('id_po', $id)
+                ->get();
+        
+        foreach ($itemsQuery as $obj) {
+            if (is_object($obj)) {
+                $items[] = (array) $obj;
+            }
+        }
+        
+        $data['items'] = $items;
+        
+        return $data;
+    }
+
+	public function updateStatus($id,$status)
+	{
+		$updateArr = array(
+			'status'	=> $status,
+		);
+		DB::table($this->_table)
+							->where('id_po',$id)
+							->update($updateArr);
+		return true;
+	}
+}

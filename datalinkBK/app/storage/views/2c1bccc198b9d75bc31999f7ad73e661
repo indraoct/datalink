@@ -1,0 +1,267 @@
+
+
+<?php $__env->startSection('css'); ?>
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="<?php echo URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.css'); ?>" rel="stylesheet" type="text/css"/>
+	<link href="<?php echo URL::asset('/assets/global/plugins/bootstrap-modal/css/bootstrap-modal.css'); ?>" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('js'); ?>
+	<!-- BEGIN PAGE LEVEL PLUGINS -->
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/datatables/media/js/jquery.dataTables.min.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/datatables/plugins/bootstrap/dataTables.bootstrap.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/scripts/datatable.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modal.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/bootstrap-modal/js/bootstrap-modalmanager.js'); ?>"></script>
+	<script type="text/javascript" src="<?php echo URL::asset('/assets/global/plugins/bootbox/bootbox.min.js'); ?>"></script>
+	<!-- END PAGE LEVEL PLUGINS -->
+        <script>
+	
+	function construct() {
+
+		/* BEGIN DATA TABLE */
+		var grid = new Datatable();
+
+				grid.init({
+					src: $("#datatable"),
+					onSuccess: function (grid) {
+						// execute some code after table records loaded
+					},
+					onError: function (grid) {
+						// execute some code on network or other general error  
+					},
+					dataTable: { // here you can define a typical datatable settings from http://datatables.net/usage/options 
+						"ajax": {
+							"url": "<?php echo URL::to('/'); ?>/warehouse/get_data", // ajax source
+						},
+						"order": [
+							[1, "asc"]
+						], // set first column as a default sort by asc
+						"columns": [
+							{ data: 'no', className: "alignCenter" },
+							{ data: 'warehouse_name' },
+							{ data: 'address' },
+                                                        { data: 'head_person'},
+							{ data: 'action', bSortable: false, className: "alignCenter" }
+						]
+					}
+				});
+		/* END DATA TABLE */
+	
+		/* BEGIN EVENT HANDLER */
+		
+		// tombol delete
+		$("#datatable tbody").on('click', "a.do_delete", function(){
+					
+			var oTable = grid.getDataTable();
+			saveDelete(oTable.row($(this).parents('tr')).data().id);
+		});	
+		/* END EVENT HANDLER */
+		
+		/* BEGIN JS FUNCTION */
+                	
+		function saveDelete(id)
+		{			
+			bootbox.confirm("Are you sure want to delete this data?", function(result) {
+			   if(result)
+			   {
+					$.ajax({
+						url: "<?php echo URL::to('/'); ?>/warehouse/delete",
+						type:"post",
+						data: 'id='+id,
+						beforeSend:function(){
+							Metronic.blockUI();
+						},
+						success:function(result){
+							var result = eval('('+result+')');
+							Metronic.unblockUI();
+							// alert(result);
+							if(result.status)
+							{
+								toastr['success'](result.alert_msg);
+								
+								// Refresh table
+								var oTable = grid.getDataTable();
+								oTable.draw();
+							}
+							else
+							{
+								toastr['error'](result.alert_msg);
+							}
+						},
+						error:function(x,h,r)
+						{
+							alert(r);
+						}
+					})
+			   }
+			}); 
+		}
+		
+		/* END JS FUNCTION */
+
+	};
+		
+	jQuery(document).ready(function() {     
+		Metronic.init(); // init metronic core components
+		Layout.init(); // init current layout
+		construct();
+		
+		<?php if(Session::get('alert')=='success'): ?>
+			toastr['success']('<?php echo Session::get("alert_msg"); ?>');
+		<?php endif; ?>
+	});
+	</script>
+<?php $__env->stopSection(); ?>
+
+<?php $__env->startSection('content'); ?>
+	<!-- BEGIN PAGE HEADER-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- BEGIN PAGE TITLE & BREADCRUMB-->
+			<h3 class="page-title">
+			<?php echo e(isset($title) ? $title : ''); ?> <small><?php echo e(isset($title_desc) ? $title_desc : ''); ?></small>
+			</h3>
+			<ul class="page-breadcrumb breadcrumb">
+				<li>
+					<i class="fa fa-home"></i>
+					<a href="#">Warehouse Management</a>
+					<i class="fa fa-angle-right"></i>
+				</li>
+				<li>
+					<a href="#">Warehouse</a>
+				</li>
+			</ul>
+			<!-- END PAGE TITLE & BREADCRUMB-->
+		</div>
+	</div>
+	<!-- END PAGE HEADER-->
+	<!-- BEGIN PAGE CONTENT-->
+	<div class="row">
+		<div class="col-md-12">
+			<!-- Begin: life time stats -->
+			<div class="portlet">
+				<?php if(hasPrivilege('warehouse','new')): ?>
+				<div class="portlet-title">
+					<div class="btn-group">
+						<a href="<?php echo URL::to('/'); ?>/warehouse/add"><button class="btn btn green filter-submit tooltips" data-original-title="Create New" id="add"><i class="fa fa-plus"></i></button></a>
+					</div>
+				</div>
+				<?php endif; ?>
+			<div class="portlet-body">
+					<div class="table-container">
+						<table class="table table-striped table-bordered table-hover" id="datatable">
+						<thead>
+						<tr role="row" class="heading">
+							<th width="5%">
+								#
+							</th>
+							<th width="20%">
+								 Name
+							</th>
+							<th width="20%">
+								 Address
+							</th>
+                                                        <th width="20%">
+								 Head Of Warehouse
+							</th>
+							<th width="10%">
+								 Actions
+							</th>
+						</tr>
+						<tr role="row" class="filter">
+							<td>
+							</td>
+							<td>
+								<input type="text" class="form-control form-filter input-sm" name="filter[warehouse_name]">
+							</td>
+							<td>
+								<input type="text" class="form-control form-filter input-sm" name="filter[address]">
+							</td>
+                                                        <td>
+								<?php echo Form::select('filter[head_person]',$list_head_person,null,array('class'=>'form-control form-filter select2 input-sm')); ?>
+
+							</td>
+							<td>
+								<center>
+									<button class="btn btn-sm yellow filter-submit tooltips" data-original-title="Cari"><i class="fa fa-search"></i> </button>
+									<button class="btn btn-sm red filter-cancel tooltips" data-original-title="Reset"><i class="fa fa-times"></i> </button>
+								</center>
+							</td>
+						</tr>
+						</thead>
+						<tbody>
+						</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<!-- End: life time stats -->
+		</div>
+	</div>
+	
+	<!-- Begin Dialog Form -->
+	<div id="modal" class="modal fade" tabindex="-1" data-focus-on="input:first" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal" aria-hidden="true"></button>
+					<h4 class="modal-title"><span id="dialog_title"></span></h4>
+				</div>
+				<div class="modal-body">
+					<div class="scroller" style="height:240px" data-always-visible="1" data-rail-visible1="1">
+						<form role="form" id="form" class="form-horizontal" action="#">
+							<div class="form-body">
+								<div class="form-group">
+									<label class="col-md-3 control-label">Warehouse Name <font color="red"><strong> * </strong></font></label>
+									<div class="col-md-5">
+                                                                                <?php echo Form::hidden('act','',array('id'=>'act')); ?>
+
+										<?php echo Form::text('warehouse_name','',array('id'=>'warehouse_name','class'=>'form-control')); ?>
+
+									</div>
+								</div>
+                                                            
+                                                                <div class="form-group">
+									<label class="col-md-3 control-label">Address <font color="red"><strong> * </strong></font></label>
+									<div class="col-md-5">
+										<?php echo Form::textarea('address','',array('id'=>'address','class'=>'form-control','size'=>'10x2')); ?>
+
+									</div>
+								</div>
+                                                            
+                                                                <div class="form-group">
+									<label class="col-md-3 control-label">Head Of Warehouse <font color="red"><strong> * </strong></font></label>
+									<div class="col-md-5">
+										<?php echo Form::select('head_person',$list_head_person,null,array('id'=>'head_person','class'=>'form-control select2')); ?>
+
+										<span class="help-block help-block-error" for="satuan"></span>
+									</div>
+								</div>
+                                                            
+                                                                <div class="form-group">
+									<label class="col-md-3 control-label">Description <font color="red"><strong> * </strong></font></label>
+									<div class="col-md-5">
+										<?php echo Form::textarea('description','',array('id'=>'description','class'=>'form-control','size'=>'10x2')); ?>
+
+									</div>
+								</div>
+							</div>
+						</form>
+					</div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" data-dismiss="modal" class="btn default">Cancel</button>
+					<button type="button" id="save" class="btn blue">Save</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<!-- End Dialog Form -->
+	
+	<!-- END PAGE CONTENT-->
+<?php $__env->stopSection(); ?>
+
+
+<?php echo $__env->make('layouts.admin.default', array_except(get_defined_vars(), array('__data', '__path')))->render(); ?>

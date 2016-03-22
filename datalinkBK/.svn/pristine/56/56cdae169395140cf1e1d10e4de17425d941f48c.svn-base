@@ -1,0 +1,224 @@
+<?php
+
+class ItemModel {
+
+	protected $_table = 'm_item';
+	protected $_id = 'id_item';
+
+	public function getData($filter, $limit, $offset, $sortBy, $sortDir)
+	{
+		$data['id'] = $this->_id;
+	
+		$tableColumn = array($this->_id,'item_code', 'item_name', 'id_category', 'id_brand','id_unit');
+		
+		$query = DB::table($this->_table." as a")
+						->select(array($this->_id, 'a.item_code AS item_code', 'a.item_name AS item_name','b.category_name AS category_name','c.brand_name AS brand_name','d.unit_name AS unit_name'))
+						->leftJoin('m_item_category as b', 'a.id_category', '=', 'b.id_category')
+                                                ->leftJoin('m_item_brand as c', 'a.id_brand', '=', 'c.id_brand')
+                                                ->leftJoin('m_item_unit as d', 'a.id_unit', '=', 'd.id_unit')
+                                                ->where('a.is_deleted',0)
+						->where('a.owner', Crypt::decrypt(Session::get('owner')));
+		
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['item_code'])
+				$query->where('a.item_code', 'LIKE', '%'.$filter['item_code'].'%');
+                        if($filter['item_name'])
+				$query->where('a.item_name', 'LIKE', '%'.$filter['item_name'].'%');
+			if($filter['id_category'])
+				$query->where('a.id_category', 'LIKE', '%'.$filter['id_category'].'%');
+			if($filter['id_brand'])
+				$query->where('a.id_brand', 'LIKE', '%'.$filter['id_brand'].'%');
+                        if($filter['id_unit'])
+				$query->where('a.id_unit', 'LIKE', '%'.$filter['id_unit'].'%');
+				
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+	}
+        
+        public function getDataStock($filter, $limit, $offset, $sortBy, $sortDir){
+            
+                        
+        }
+
+	public function insertData($data)
+	{
+		try
+		{
+			DB::beginTransaction();
+			$insertCustomer = array(
+				'owner' => Crypt::decrypt(Session::get('owner')),
+				'id_category'	=> $data['custCategory'],
+				'id_sales_person'	=> $data['salesPerson'],
+				'customer_name'	=> $data['custName'],
+				'description'	=> $data['desc'],
+				'address'	=> $data['addr'],
+				'telephone'	=> $data['phone'],
+				'fax'	=> $data['fax'],
+				
+				'bank_name'	=> $data['bank'],
+				'bank_acct_no'	=> $data['bankAcct'],
+				'bank_acct_name'	=> $data['acctName'],
+				'npwp'	=> $data['npwp'],
+				'pkp'	=> $data['pkp'],
+				'pkp_date'	=> defaultDate($data['pkpDate']),
+				'tax'	=> ($data['rInterval']) ? 1 : 0,
+				'currency'	=> $data['rCcy'],
+				'term_of_payment'	=> $data['rTop'],
+				'credit_interval'	=> ($data['rInterval']) ? $data['rInterval'] : 0,
+				'credit_plafond'	=> ($data['rPlafond']) ? (defaultNumeric($data['rPlafond'])) : 0,
+				'account_receivable'	=> $data['rReceive'],
+
+				'is_deleted'=> 0,
+				'created_by' => Session::get('user_name'),
+				'created_at'=> DB::raw('now()')
+			);
+
+		   $id = DB::table($this->_table)->insertGetId($insertCustomer);
+		   $insertContact = array(
+				'owner' => Crypt::decrypt(Session::get('owner')),
+				'id_customer'	=> $id,
+				'contact_title'	=> $data['contTitle'],
+				'contact_name'	=> $data['contName'],
+				'position'	=> $data['contPosition'],
+				'address'	=> $data['contAddr'],
+				'phone_mobile'	=> $data['contMobilePhone'],
+				'phone_work'	=> $data['contPhone'],
+				'email'	=> $data['contEmail'],
+				
+				'is_deleted'=> 0,
+				'created_by' => Session::get('user_name'),
+				'created_at'=> DB::raw('now()')
+			);
+		   DB::table('m_customer_contact')->insertGetId($insertContact);
+		   DB::commit();
+		}catch(Exception $e)
+		{
+			DB::rollback();
+			return $e->getMessage();
+		}
+        return false;
+	}
+
+	public function deleteData($id)
+	{
+        $updateArr = array(
+
+            'is_deleted'	=> 1,
+            'updated_by' => Session::get('user_name'),
+            'updated_at'=> DB::raw('now()'),
+            'deleted_at'=> DB::raw('now()')
+        );
+       
+		DB::table($this->_table)
+							->where($this->_id,$id)
+							->update($updateArr);
+		DB::table('m_customer_contact')
+							->where($this->_id,$id)
+							->update($updateArr);
+        return true;
+	}
+
+	public function getDetail($id)
+	{
+		$queryCustomer = DB::table($this->_table)
+						->select('*',DB::raw('date(pkp_date) as pkpDate'))
+						->where('is_deleted',0)
+						->where('id_customer',$id)
+						->where('owner', Crypt::decrypt(Session::get('owner')));
+
+		$data['customer'] = $queryCustomer->first();
+
+		if($data['customer'])
+		{
+			$queryCustContact = DB::table('m_customer_contact')
+													->select('*')
+													->where('is_deleted',0)
+													->where('id_customer',$id)
+													->where('owner', Crypt::decrypt(Session::get('owner')));
+			
+			$data['contact'] = $queryCustContact->first();
+		}
+		else
+		{
+			$data = false;
+		}
+
+		return $data;
+	}
+	
+	public function updateData($data)
+	{
+		if(empty($data['id'])) return 'Data Not Found';
+		try
+		{
+			DB::beginTransaction();
+			$updateCustomer = array(
+				'id_category'	=> $data['custCategory'],
+				'id_sales_person'	=> $data['salesPerson'],
+				'customer_name'	=> $data['custName'],
+				'description'	=> $data['desc'],
+				'address'	=> $data['addr'],
+				'telephone'	=> $data['phone'],
+				'fax'	=> $data['fax'],
+				
+				'bank_name'	=> $data['bank'],
+				'bank_acct_no'	=> $data['bankAcct'],
+				'bank_acct_name'	=> $data['acctName'],
+				'npwp'	=> $data['npwp'],
+				'pkp'	=> $data['pkp'],
+				'pkp_date'	=> defaultDate($data['pkpDate']),
+				'tax'	=> ($data['rInterval']) ? 1 : 0,
+				'currency'	=> $data['rCcy'],
+				'term_of_payment'	=> $data['rTop'],
+				'credit_interval'	=> ($data['rInterval']) ? $data['rInterval'] : 0,
+				'credit_plafond'	=> ($data['rPlafond']) ? (defaultNumeric($data['rPlafond'])) : 0,
+				'account_receivable'	=> $data['rReceive'],
+
+				'updated_by' => Session::get('user_name'),
+				'updated_at'=> DB::raw('now()')
+			);
+
+		   DB::table($this->_table)->where($this->_id,$data['id'])->update($updateCustomer);
+
+		   $updateContact = array(
+				'owner' => Crypt::decrypt(Session::get('owner')),
+				'contact_title'	=> $data['contTitle'],
+				'contact_name'	=> $data['contName'],
+				'position'	=> $data['contPosition'],
+				'address'	=> $data['contAddr'],
+				'phone_mobile'	=> $data['contMobilePhone'],
+				'phone_work'	=> $data['contPhone'],
+				'email'	=> $data['contEmail'],
+
+				'updated_by' => Session::get('user_name'),
+				'updated_at'=> DB::raw('now()')
+			);
+		   DB::table('m_customer_contact')->where($this->_id,$data['id'])->update($updateContact);
+		   DB::commit();
+		}catch(Exception $e)
+		{
+			DB::rollback();
+			return $e->getMessage();
+		}
+        return true;
+	}
+	
+	public function hasProject($id)
+	{
+		$data = DB::table('m_project')
+						->select('id_customer')
+						->where($this->_id,$id)
+						->where('owner', Crypt::decrypt(Session::get('owner')))
+						->where('is_deleted',0)
+						->get();
+       
+        return $data;
+	}
+}

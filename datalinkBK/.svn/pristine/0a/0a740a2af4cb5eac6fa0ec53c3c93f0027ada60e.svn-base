@@ -1,0 +1,471 @@
+<?php 
+
+class ItemController extends BaseController 
+{
+	protected $_defaultModel = 'ItemModel';
+	protected $_pageTitle = 'Item';
+	protected $_menuId = 'item';
+    
+	public function __construct()
+	{
+        
+    }
+    
+    public function index()
+	{
+          $listCategory 	= GeneralModel::getSelectionList('m_item_category','id_category','category_name');
+	  $listBrand 	        = GeneralModel::getSelectionList('m_item_brand','id_brand','brand_name');
+	  $listUnit 	        = GeneralModel::getSelectionList('m_item_unit','id_unit','unit_name');	
+        
+		$param = array(
+							'title'			=> $this->_pageTitle,
+							'title_desc'	=> 'Item',
+							'menu_id'		=> $this->_menuId,
+                                                        'listCategory' => array('' => '-- Please Select --') + $listCategory,
+                                                        'listBrand' => array('' => '-- Please Select --') + $listBrand,
+                                                        'listUnit' => array('' => '-- Please Select --') + $listUnit,
+						);
+        return View::make('modules.item.index',$param);
+    }
+
+	public function getData()
+	{
+		if(Request::ajax()){
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			$iDisplayLength = intval($param['length']);
+			$limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+			$offset = intval($param['start']);
+			$draw = intval($param['draw']);
+			$sortBy = $param['order'][0]['column'];
+			$sortDir = $param['order'][0]['dir'];
+			$filter = isset($param['filter']) ? $param['filter'] : array();
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+			
+			$data = array();
+			$n = $offset + 1;
+			foreach($get['data'] as $key=>$r)
+			{
+				$row = $r;
+				
+				$row->id = $r->$get['id'];
+				unset($row->$get['id']);
+                                
+                                $row->item_name_link = '<a href="'.URL::to('/').'/item/detail/'.encode($row->id).'" class="show_detail">'.$r->item_name.'</a> ';
+				
+				$ubah = $hapus = '';
+				if($privi['edit']) 
+					$ubah = '<a href="'.URL::to('/').'/item/edit/'.encode($row->id).'" class="btn btn-xs purple tooltips show_edit" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+				if($privi['delete'])
+					$hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+				
+				$row->action = '<div>'.$ubah.$hapus.'</div>';
+				$row->no = $n;
+				
+				$data[$key] = $row;
+				
+				$n++;
+			}
+			
+			$records["data"] = $get['data'];
+			$records["draw"] = $draw;
+			$records["recordsTotal"] = $get['count'];
+			$records["recordsFiltered"] = $get['filter_count'];;
+			
+                       
+			echo json_encode($records);
+		
+		}
+	}
+        
+        public function getDataStock(){
+            
+            if(Request::ajax()){
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			$iDisplayLength = intval($param['length']);
+			$limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+			$offset = intval($param['start']);
+			$draw = intval($param['draw']);
+			$sortBy = $param['order'][0]['column'];
+			$sortDir = $param['order'][0]['dir'];
+			$filter = isset($param['filter']) ? $param['filter'] : array();
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getDataStock($filter, $limit, $offset, $sortBy, $sortDir);
+			
+			$data = array();
+			$n = $offset + 1;
+			foreach($get['data'] as $key=>$r)
+			{
+				$row = $r;
+				
+				$row->id = $r->$get['id'];
+				unset($row->$get['id']);
+                                
+                                $row->item_name_link = '<a href="'.URL::to('/').'/item/detail/'.encode($row->id).'" class="show_detail">'.$r->item_name.'</a> ';
+				
+				$ubah = $hapus = '';
+				if($privi['edit']) 
+					$ubah = '<a href="'.URL::to('/').'/item/edit/'.encode($row->id).'" class="btn btn-xs purple tooltips show_edit" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+				if($privi['delete'])
+					$hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+				
+				$row->action = '<div>'.$ubah.$hapus.'</div>';
+				$row->no = $n;
+				
+				$data[$key] = $row;
+				
+				$n++;
+			}
+			
+			$records["data"] = $get['data'];
+			$records["draw"] = $draw;
+			$records["recordsTotal"] = $get['count'];
+			$records["recordsFiltered"] = $get['filter_count'];;
+		
+                       
+			echo json_encode($records);
+		
+		}
+            
+            
+        }
+        
+        public function getDataTambahan(){
+            
+            if(Request::ajax()){
+                $id_item = $_POST['id_item'];
+                $id_warehouse = $_POST['id_warehouse'];
+                $model = new $this->_defaultModel;
+                
+                $get = $model->getDataTambahan($id_item,$id_warehouse);
+                
+                echo json_encode($get);
+            }
+           
+        }
+    
+	public function add()
+	{
+		$listCategory 	= GeneralModel::getSelectionList('m_item_category','id_category','category_name');
+                $listBrand 	        = GeneralModel::getSelectionList('m_item_brand','id_brand','brand_name');
+                $listUnit 	        = GeneralModel::getSelectionList('m_item_unit','id_unit','unit_name');	
+        	$listType               = array("1"=>"Main Material","2"=>"Support Material","3"=>"Packages","4"=>"Services","5"=>"Others");
+                $listTax                = array("PPN"=>"PPN","PPH 23"=>"PPH 23");
+                $listInventory          = array(""=>"");
+                $listCOGS               = array(""=>"");
+                $listSales              = array(""=>"");
+
+		$param = array(
+						'title'					=> $this->_pageTitle,
+						'title_desc'		=> 'Client',
+						'menu_id'		=> $this->_menuId,
+						'act'					=> 'New',
+						'listCategory'	=> array('' => '-- Please Select --') + $listCategory,
+                                                'listBrand' => array('' => '-- Please Select --') + $listBrand,
+                                                'listUnit' => array('' => '-- Please Select --') + $listUnit,
+                                                'listType' => array('' => '-- Please Select --') + $listType,
+                                                'listTax' => array('' => '-- Please Select --') + $listTax,
+                                                'listInventory' => array('' => '-- Please Select --') + $listInventory,
+                                                'listCOGS' => array('' => '-- Please Select --') + $listCOGS,
+                                                'listSales' => array('' => '-- Please Select --') + $listSales,
+					);
+		return View::make('modules.item.add',$param);
+	}
+
+    public function doAdd()
+	{
+		$input = Input::all();
+
+		$rules = $this->rules($input);
+		$validator = Validator::make($input, $rules);
+		if($validator->fails())
+		{
+			$errorArr = array();
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> 'Error occured. Please check again.',
+						'error_msg'	=> $errorArr
+					);
+		}    
+		else
+		{                                    
+			$model = new $this->_defaultModel;
+			$return = $model->insertData($input);
+
+			if($return === true)
+			{
+				$ret = array(
+							'status'		=> true,
+							'alert_msg'	=> 'Successfully added.',
+							'error_msg'	=> $return,
+						);
+			}
+			else
+			{
+				$ret = array(
+							'status'		=> false,
+							'alert_msg'	=> 'Addition failed. Please contact your administrator.',
+							'error_msg'	=> $return
+						);
+			}
+                        
+		}//end of validator
+		
+                
+                $alertArr = array(
+							'alert' 			=> 'success',
+							'alert_msg' 	=> $ret['alert_msg'],
+						);
+		return Redirect::to('item')->with($alertArr);
+    }
+    
+	public function edit($idItem)
+	{
+		$idItem = decode($idItem);
+
+		$model = new $this->_defaultModel;
+		$getDetail = $model->getDetail($idItem);
+
+		if(!$getDetail)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		} 
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+		$listCategory 	= GeneralModel::getSelectionList('m_item_category','id_category','category_name');
+                $listBrand 	        = GeneralModel::getSelectionList('m_item_brand','id_brand','brand_name');
+                $listUnit 	        = GeneralModel::getSelectionList('m_item_unit','id_unit','unit_name');	
+        	$listType               = array("1"=>"Main Material","2"=>"Support Material","3"=>"Packages","4"=>"Services","5"=>"Others");
+                $listTax                = array("PPN"=>"PPN","PPH 23"=>"PPH 23");
+                $listInventory          = array(""=>"");
+                $listCOGS               = array(""=>"");
+                $listSales              = array(""=>"");
+		
+                
+                $segment = Request::segment(2);
+                
+                $param = array(
+						'title'					=> $this->_pageTitle,
+						'title_desc'		=> 'Client',
+						'menu_id'		=> $this->_menuId,
+						'act'					=> 'Edit',
+                                                'listWarehouse'	=> array('' => '-- Please Select --') + $listWarehouse,
+						'listCategory'	=> array('' => '-- Please Select --') + $listCategory,
+                                                'listBrand' => array('' => '-- Please Select --') + $listBrand,
+                                                'listUnit' => array('' => '-- Please Select --') + $listUnit,
+                                                'listType' => array('' => '-- Please Select --') + $listType,
+                                                'listTax' => array('' => '-- Please Select --') + $listTax,
+                                                'listInventory' => array('' => '-- Please Select --') + $listInventory,
+                                                'listCOGS' => array('' => '-- Please Select --') + $listCOGS,
+                                                'listSales' => array('' => '-- Please Select --') + $listSales,
+                                                'item' => $getDetail['item'],
+                                                'segment' => $segment,
+					);
+                
+                
+		return View::make('modules.item.edit',$param);
+	}
+
+    public function doEdit()
+	{
+		$input = Input::all();
+
+		$rules = $this->rules($input);
+		$validator = Validator::make($input, $rules);
+		if($validator->fails())
+		{
+			$errorArr = array();
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> 'Error occured. Please check again.',
+						'error_msg'	=> $errorArr
+					);
+		}    
+		else
+		{                                    
+			$model = new $this->_defaultModel;
+			$return = $model->updateData($input);
+
+			if(is_integer($return) && $return != false )
+			{
+				$ret = array(
+							'status'		=> true,
+							'alert_msg'	=> 'Successfully updated.',
+							'error_msg'	=> $return,
+						);
+			}
+			else
+			{
+				$ret = array(
+							'status'		=> false,
+							'alert_msg'	=> 'Update failed. Please contact your administrator.',
+							'error_msg'	=> $return
+						);
+			}
+		}//end of validator
+		
+                
+                 $alertArr = array(
+							'alert' 			=> 'success',
+							'alert_msg' 	=> $ret['alert_msg'],
+						);
+                 
+               
+		return Redirect::to('item')->with($alertArr);
+    }
+    
+    
+    public function doAddUnit(){
+       
+        $input = Input::all();
+                
+        $rules = array('unit_name' => 'required');
+        
+        $validator = Validator::make($input, $rules);
+        
+        if($validator->fails())
+		{    
+			$errorArr = array();
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> 'Error occured. Please check again..',
+						'error_msg'	=> $errorArr
+					);
+        }    
+        else
+		{                                    
+			$model = new $this->_defaultModel;
+			$ins = $model->insertDataUnit($input);
+		  
+			$alert = isset($input['from']) ? 'Item Unit' : 'Data';
+			if($ins)
+			{
+				$ret = array(
+							'status'		=> true,
+							'alert_msg'	=> $alert.' has been successfully added.',
+							'error_msg'	=> array(),
+							'id'				=> $input['unit_name']
+						);
+			}
+			else
+			{
+				$ret = array(
+							'status'		=> false,
+							'alert_msg'	=> 'Addition failed. Please contact your administrator.',
+							'error_msg'	=> array()
+						);
+			}
+        }//end of validator
+		
+		echo json_encode($ret);
+
+    }
+    
+    /*
+     * do validate
+     */
+    
+    public function doValidate()
+	{
+        $input = Input::all();
+		$validate = true;
+		
+		$errorArr = array();
+		$alertMsg = 'Error occured. Please check again.';
+                
+        //rules        
+        $rules = $this->rules();
+		
+	
+        $validator = Validator::make($input, $rules);
+		if($validator->fails())
+		{
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			$validate = false;
+		}
+        
+        if(!$validate)
+		{    
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> $alertMsg,
+						'error_msg'	=> $errorArr
+					);
+        }    
+        else
+		{                
+			$ret = array(
+						'status'		=> true,
+						'alert_msg'	=> '',
+						'error_msg'	=> array()
+					);
+        } //end of validator
+		
+		echo json_encode($ret);
+    }
+    
+	public function rules()
+	{
+		$rules = array(
+									'itemCode' => 'required',
+									'itemName' => 'required',
+									'itemType' => 'required',
+									'itemUnit' => 'required',
+                                                                        'itemBrand' => 'required',
+                                                                        'itemCategory' => 'required',
+                                                                        'tax'           => 'required',
+									
+								);
+
+	
+
+		return $rules;
+	}
+	
+    public function doDelete()
+	{
+        $id = intval(Input::get('id'));
+		$model = new $this->_defaultModel;
+		
+			$del = $model->deleteData($id);
+			$ret = array(
+						'status'		=> $del,
+						'alert_msg'	=> $del ? 'Successfully deleted.' : 'Deletion failed. Please contact your administrator.',
+						'error_msg'	=> array()
+					);
+		
+		echo json_encode($ret);
+	}
+    
+}

@@ -1,0 +1,96 @@
+<?php
+
+/*Additional library...
+ * Add anythonh you want
+ * Call everywhere with System::method($params)
+ * */
+
+Class Stok
+{    
+	protected $_owner;
+
+	public function __construct($owner)
+	{
+		$this->_owner		=  $owner;
+	}
+	
+	public function createTrx($param,$paramDetail)
+	{
+        $insertTrx = array(
+		
+            'owner' 		=> $this->_owner,
+            'kode_trx'	=> $param['kode_trx'],
+            'id_ref'			=> $param['id_ref'],
+            'no_ref'		=> $param['no_ref'],
+            'tanggal'		=> $param['tanggal'],
+            'notes' 		=> $param['notes'],
+            'created_at'	=> DB::raw('now()')
+
+        );
+		
+		$id_trx = DB::table('t_stok_trx')->insertGetId($insertTrx);
+		
+		$insertTrxDetail = array();
+		foreach($paramDetail as $row)
+		{
+			$id_cabang = $row['id_cabang'];
+			$id_produk = $row['id_produk'];
+			$stok_in = isset($row['stok_in']) ? $row['stok_in'] : 0;
+			$stok_out = isset($row['stok_out']) ? $row['stok_out'] : 0;
+		
+			$sisa_stok = $this->updateStokCabang($id_cabang,$id_produk,$stok_in,$stok_out);
+		
+			$insertTrxDetail[] = array(
+			
+				'id_trx'				=> $id_trx,
+				'id_cabang'		=> $id_cabang,
+				'id_produk'		=> $id_produk,
+				'stok_in'			=> $stok_in,
+				'stok_out'			=> $stok_out,
+				'sisa_stok'		=> $sisa_stok,
+				
+			);
+		}
+		
+		DB::table('t_stok_trx_detail')->insert($insertTrxDetail);
+	}
+	
+	function updateStokCabang($id_cabang,$id_produk,$stok_in,$stok_out)
+	{
+		$dataStok = DB::table('t_stok_cabang')
+								->where('owner',$this->_owner)
+								->where('id_cabang',$id_cabang)
+								->where('id_produk',$id_produk)
+								->first();
+		if($dataStok)
+		{
+			$stok_awal = $dataStok->stok_awal;
+			$stok_in += $dataStok->stok_in;
+			$stok_out += $dataStok->stok_out;
+			$updateArr = array(
+				'stok_in'	=> $stok_in,
+				'stok_out'	=> $stok_out
+			);
+		   
+			DB::table('t_stok_cabang')
+					->where('id',$dataStok->id)
+					->update($updateArr);
+		}
+		else
+		{
+			$stok_awal = 0;
+			$insertArr = array(
+							'owner' 		=> $this->_owner,
+							'id_cabang' 	=> $id_cabang,
+							'id_produk'	=> $id_produk,
+							'stok_awal'	=> $stok_awal,
+							'stok_in' 		=> $stok_in,
+							'stok_out' 	=> $stok_out,
+						);
+						
+			DB::table('t_stok_cabang')->insert($insertArr);
+		}
+		
+		return ($stok_awal + $stok_in - $stok_out);
+	}    
+}

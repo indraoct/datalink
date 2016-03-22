@@ -1,0 +1,108 @@
+<html>
+	<head>
+		<title> Report PDF </title>
+			<style type="text/css">
+			body {
+				color: black;
+				font-family: "Open Sans", sans-serif;
+				padding: 0px !important;
+				margin: 0px !important;
+				font-size: 13px;
+				direction: ltr;
+			}
+			
+			th {
+				background-color: #eee;
+				padding: 8px;
+				line-height: 1.42857143;
+				vertical-align: middle;
+				border-top: 1px solid #ddd;
+				box-sizing: content-box;
+				text-align: right;
+				border-radius: 0 !important;
+				display: table-cell;
+				box-sizing: border-box;
+				border-collapse: separate !important;
+			}
+			
+			table, td, select, textarea, input {
+				font-size: 11px;
+				border-spacing: 0;
+				border-color: gray;
+				padding-right: 18px;
+			}
+		
+			
+			.tbl-evencontent {
+				background-color: WHITE;
+				padding: 8px;
+				line-height: 1.42857143;
+				vertical-align: middle;
+				border-top: 1px solid #ddd;
+				box-sizing: content-box;
+				text-align: right;
+				border-radius: 0 !important;
+				display: table-cell;
+				box-sizing: border-box;
+				border-collapse: separate !important;
+			}
+
+			.tbl-oddcontent {
+				background-color: #f9f9f9;
+				padding: 8px;
+				line-height: 1.42857143;
+				vertical-align: middle;
+				border-top: 1px solid #ddd;
+				box-sizing: content-box;
+				text-align: right;
+				border-radius: 0 !important;
+				display: table-cell;
+				box-sizing: border-box;
+				border-collapse: separate !important;;
+			}
+			
+			@page {
+			  @bottom-left {
+				color: #205CF5;
+				content: "";
+			  }
+			  @bottom-right {
+					font-family: Arial, Helvetica, sans-serif;
+					font-size: 12px;
+				content: "Page " counter(page) " of " counter(pages);
+			  }
+			}
+		</style>
+	</head>
+	<body>
+		<table>
+			<thead>
+			<tr role="row" class="heading">
+			<?php
+				foreach($tableHeader as $content)
+				{
+					echo "<th>{$content}</th>";
+				}
+			?>
+			</tr>
+			</thead>
+			<tbody>
+			<?php
+				$n = 0;
+				foreach($data as $row)
+				{
+					echo "<tr>";
+					$td_css = ($n%2==0)?'tbl-evencontent':'tbl-oddcontent';
+					foreach($row as $tdData)
+					{
+						echo "<td class='{$td_css}'>{$tdData}</td>";
+					}
+					$n++;
+					echo "</tr>";
+				}
+			?>
+			</tbody>
+		</table>
+	</body>
+
+</html>

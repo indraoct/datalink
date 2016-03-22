@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<!--[if IE 8]> <html lang="en" class="ie8 no-js"> <![endif]-->
+<!--[if IE 9]> <html lang="en" class="ie9 no-js"> <![endif]-->
+<!--[if !IE]><!-->
+<html lang="en" class="no-js">
+<!--<![endif]-->
+<!-- BEGIN HEAD -->
+<head>
+<meta charset="utf-8"/>
+<title>{{{ $title or '' }}} | Sisfoo</title>
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="" name="description"/>
+<meta content="" name="author"/>
+<!-- BEGIN GLOBAL MANDATORY STYLES -->
+
+<!-- <link href="http://fonts.googleapis.com/css?family=Open+Sans:400,300,600,700&subset=all" rel="stylesheet" type="text/css"/> -->
+<link href="{{ URL::asset('/assets/global/plugins/font-awesome/css/font-awesome.min.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/global/plugins/simple-line-icons/simple-line-icons.min.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap-switch/css/bootstrap-switch.min.css" rel="stylesheet" type="text/css') }}"/>
+<link href="{{ URL::asset('/assets/global/plugins/uniform/css/uniform.default.css') }}" rel="stylesheet" type="text/css"/>
+<!-- END GLOBAL MANDATORY STYLES -->
+<!-- BEGIN ADDITIONAL STYLES -->
+
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap-toastr/toastr.min.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap-select/bootstrap-select.min.css') }}" rel="stylesheet" type="text/css" />
+<link href="{{ URL::asset('/assets/global/plugins/select2/select2.css') }}" rel="stylesheet" type="text/css" />
+
+	@yield('css')
+
+<!-- END ADDITIONAL STYLES -->
+<!-- BEGIN THEME STYLES -->
+<link href="{{ URL::asset('/assets/global/css/components.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/global/css/plugins.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/admin/layout/css/layout.css') }}" rel="stylesheet" type="text/css"/>
+<link href="{{ URL::asset('/assets/admin/layout/css/themes/default.css') }}" rel="stylesheet" type="text/css" id="style_color"/>
+<link href="{{ URL::asset('/assets/admin/layout/css/custom.css') }}" rel="stylesheet" type="text/css"/>
+<!-- END THEME STYLES -->
+<link rel="shortcut icon" href="favicon.ico"/>
+</head>
+<!-- END HEAD -->
+<!-- BEGIN BODY -->
+<!-- DOC: Apply "page-header-fixed-mobile" and "page-footer-fixed-mobile" class to body element to force fixed header or footer in mobile devices -->
+<!-- DOC: Apply "page-sidebar-closed" class to the body and "page-sidebar-menu-closed" class to the sidebar menu element to hide the sidebar by default -->
+<!-- DOC: Apply "page-sidebar-hide" class to the body to make the sidebar completely hidden on toggle -->
+<!-- DOC: Apply "page-sidebar-closed-hide-logo" class to the body element to make the logo hidden on sidebar toggle -->
+<!-- DOC: Apply "page-sidebar-hide" class to body element to completely hide the sidebar on sidebar toggle -->
+<!-- DOC: Apply "page-sidebar-fixed" class to have fixed sidebar -->
+<!-- DOC: Apply "page-footer-fixed" class to the body element to have fixed footer -->
+<!-- DOC: Apply "page-sidebar-reversed" class to put the sidebar on the right side -->
+<!-- DOC: Apply "page-full-width" class to the body element to have full width page without the sidebar menu -->
+<body class="page-header-fixed page-quick-sidebar-over-content">
+<!-- BEGIN HEADER -->
+<div class="page-header navbar navbar-fixed-top">
+	<!-- BEGIN HEADER INNER -->
+	<div class="page-header-inner">
+		<!-- BEGIN LOGO -->
+		<div class="page-logo">
+			<a href="#">
+			<img src="{{ URL::asset('/assets/admin/layout/img/logo.png') }}" alt="logo" class="logo-default"/>
+			</a>
+			<div class="menu-toggler sidebar-toggler hide">
+				<!-- DOC: Remove the above "hide" to enable the sidebar toggler button on header -->
+			</div>
+		</div>
+		<!-- END LOGO -->
+		<!-- BEGIN RESPONSIVE MENU TOGGLER -->
+		<a href="javascript:;" class="menu-toggler responsive-toggler" data-toggle="collapse" data-target=".navbar-collapse">
+		</a>
+		<!-- END RESPONSIVE MENU TOGGLER -->
+		<!-- BEGIN TOP NAVIGATION MENU -->
+		<div class="top-menu">
+			<ul class="nav navbar-nav pull-right">
+				<!-- BEGIN NOTIFICATION DROPDOWN -->
+				<li class="dropdown dropdown-extended dropdown-notification" id="header_notification_bar">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+					<i class="icon-bell"></i>
+					<span class="badge badge-default">
+					0 </span>
+					</a>
+					<ul class="dropdown-menu">
+						<li>
+							<p>
+								 You have 0 new notification(s)
+							</p>
+						</li>
+						<li>
+							<ul class="dropdown-menu-list scroller" style="height: 250px;">
+								<li>
+									<a href="#">
+									<span class="label label-sm label-icon label-success">
+									<i class="fa fa-plus"></i>
+									</span>
+									New user registered. <span class="time">
+									Just now </span>
+									</a>
+								</li>
+							</ul>
+						</li>
+						<li class="external">
+							<a href="#">
+							See all notifications <i class="m-icon-swapright"></i>
+							</a>
+						</li>
+					</ul>
+				</li>
+				<!-- END NOTIFICATION DROPDOWN -->
+				<!-- BEGIN USER LOGIN DROPDOWN -->
+				<li class="dropdown dropdown-user">
+					<a href="#" class="dropdown-toggle" data-toggle="dropdown" data-hover="dropdown" data-close-others="true">
+					<img alt="" class="img-circle" src="{{ URL::asset('/assets/admin/layout/img/avatar3_small.jpg') }}"/>
+					<span class="username">
+					Bob </span>
+					<i class="fa fa-angle-down"></i>
+					</a>
+					<ul class="dropdown-menu">
+						<li>
+							<a href="{{ URL::to('/') }}/change_password">
+							<i class="icon-user"></i> Change Password </a>
+						</li>
+						<li class="divider">
+						</li>
+						<li>
+							<a href="{{ URL::to('/') }}/logout">
+							<i class="icon-key"></i> Log Out </a>
+						</li>
+					</ul>
+				</li>
+				<!-- END USER LOGIN DROPDOWN -->
+				<!-- END USER LOGIN DROPDOWN -->
+			</ul>
+		</div>
+		<!-- END TOP NAVIGATION MENU -->
+	</div>
+	<!-- END HEADER INNER -->
+</div>
+<!-- END HEADER -->
+<div class="clearfix">
+</div>
+<!-- BEGIN CONTAINER -->
+<div class="page-container">
+
+	<!-- BEGIN SIDEBAR -->
+	
+        @include('layouts.admin.sidebar')
+		
+	<!-- END SIDEBAR -->
+
+	<!-- BEGIN CONTENT -->
+	<div class="page-content-wrapper">
+		<div class="page-content">
+		
+		
+            @yield('content')
+			
+		
+		</div>
+	</div>
+	<!-- END CONTENT -->
+</div>
+<!-- END CONTAINER -->
+<!-- BEGIN FOOTER -->
+<div class="page-footer">
+	<div class="page-footer-inner">
+		 2014 &copy; PT Solusi Data Pratama.
+	</div>
+	<div class="page-footer-tools">
+		<span class="go-top">
+		<i class="fa fa-angle-up"></i>
+		</span>
+	</div>
+</div>
+<!-- END FOOTER -->
+<!-- BEGIN JAVASCRIPTS(Load javascripts at bottom, this will reduce page load time) -->
+<!-- BEGIN CORE PLUGINS -->
+<!--[if lt IE 9]>
+<script src="{{ URL::asset('/assets/global/plugins/respond.min.js') }}"></script>
+<script src="{{ URL::asset('/assets/global/plugins/excanvas.min.js') }}"></script> 
+<![endif]-->
+<script src="{{ URL::asset('/assets/global/plugins/jquery.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/jquery-migrate-1.2.1.min.js') }}" type="text/javascript"></script>
+<!-- IMPORTANT! Load jquery-ui-1.10.3.custom.min.js before bootstrap.min.js to fix bootstrap tooltip conflict with jquery ui tooltip -->
+<script src="{{ URL::asset('/assets/global/plugins/jquery-ui/jquery-ui-1.10.3.custom.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/bootstrap/js/bootstrap.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/bootstrap-hover-dropdown/bootstrap-hover-dropdown.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/bootstrap-switch/js/bootstrap-switch.min.js" type="text/javascript') }}"></script>
+<script src="{{ URL::asset('/assets/global/plugins/jquery-slimscroll/jquery.slimscroll.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/jquery.blockui.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/jquery.cokie.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/uniform/jquery.uniform.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/autonumeric.js') }}" type="text/javascript"></script>
+<!-- END CORE PLUGINS -->
+<!-- BEGIN PAGE LEVEL SCRIPTS -->
+<script src="{{ URL::asset('/assets/global/scripts/global.js') }}" type="text/javascript"></script>
+<script type="text/javascript"> 
+	var menuId = "{{ $menu_id }}"; 
+	var assetsPath = "{{ URL::asset('/assets/').'/' }}"; 
+</script>
+<script src="{{ URL::asset('/assets/global/scripts/metronic.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/admin/layout/scripts/layout.js') }}" type="text/javascript"></script>
+<!-- END PAGE LEVEL SCRIPTS -->
+<!-- BEGIN PAGE LEVEL PLUGINS -->
+
+<script src="{{ URL::asset('/assets/global/plugins/bootstrap-toastr/toastr.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/bootstrap-select/bootstrap-select.min.js') }}" type="text/javascript"></script>
+<script src="{{ URL::asset('/assets/global/plugins/select2/select2.min.js') }}"type="text/javascript" ></script>
+
+	@yield('js')
+
+<script type="text/javascript"> 
+			
+	toastr.options = {
+	  "closeButton": true,
+	  "debug": false,
+	  "positionClass": "toast-top-center",
+	  "onclick": null,
+	  "showDuration": "1000",
+	  "hideDuration": "1000",
+	  "timeOut": "3000",
+	  "extendedTimeOut": "0",
+	  "showEasing": "swing",
+	  "hideEasing": "linear",
+	  "showMethod": "fadeIn",
+	  "hideMethod": "fadeOut"
+	}
+
+	$( document ).ajaxComplete(function() {
+       $('.tooltips').tooltip();
+	});
+		
+	$(".bs-select").selectpicker({
+		iconBase: 'fa',
+		tickIcon: 'fa-check'
+	});
+		
+	$(".select2").select2();
+	
+	$('.currency').autoNumeric('init', {{ autoNumeric() }});
+	$('.digits').keypress(function(event) {
+		return Digits(event);
+	});
+	
+	$('input, :input').attr('autocomplete', 'off');
+	$('input.form-control').addClass('input-sm');
+</script>
+<!-- END PAGE LEVEL PLUGINS -->
+<!-- END JAVASCRIPTS -->
+</body>
+<!-- END BODY -->
+</html>

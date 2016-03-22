@@ -1,0 +1,601 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Application Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register all of the routes for an application.
+| It's a breeze. Simply tell Laravel the URIs it should respond to
+| and give it the Closure to execute when that URI is requested.
+|
+*/
+Route::pattern('id', '[0-9]+');
+
+Route::get('/', function()
+{
+	if (Auth::check())
+		return Redirect::route('home');
+	else
+		return Redirect::route('login');
+});
+
+Route::group(array('prefix'=>'login','as'=>'login','before'=>'guest'),function()
+{
+    Route::get('/',function()
+	{
+        Session::put('page', 'login');
+		$param = array(
+							'title'			=> 'Login',
+							'menu_id'		=> 'login',
+							'body_class'	=> 'login'
+						);
+        return View::make('modules.login',$param);
+    });
+
+    Route::post('/', array('uses' => 'AuthController@doLogin'));
+});
+
+Route::get('missing', array('as' => 'missing', function () 
+{ 
+	$param = array(
+						'title'			=> 'Page 404',
+						'menu_id'		=> 'missing',
+						'body_class'	=> 'page-404-full-page'
+					);
+	if (Auth::check())
+	{
+		return Response::view('errors.missing_admin', $param, 404);
+	}
+	else
+	{ 
+		return Response::view('errors.missing', $param, 404);
+	}
+}));
+
+Route::get('forbidden', array('as' => 'forbidden', function () 
+{ 
+	$param = array(
+						'title'			=> 'Not Allowed',
+						'menu_id'		=> 'forbidden',
+						'body_class'	=> 'page-404-full-page'
+					);
+	return Response::view('errors.forbidden', $param);
+}));
+
+// menu that could be accessed after login
+Route::group(array('before' => 'auth'), function()
+{
+	Route::get('home', array('as' => 'home', function()
+	{
+		$param = array(
+							'title'			=> 'Home',
+							'menu_id'		=> 'home',
+						);
+		return View::make('modules.home.index',$param);
+	}));
+
+	Route::get('logout', array('as' => 'logout', function () 
+	{ 
+		Session::flush(); // clear the session
+		Auth::logout();
+		return Redirect::to('/');
+	}));
+
+	Route::group(array('prefix'=>'customer_category','as'=>'customer_category'),function()
+	{
+		Route::get('/',array('uses'=>'CustomerCategoryController@index'));
+		Route::post('/get_data',array('uses'=>'CustomerCategoryController@getData'));
+		Route::post('/add',array('uses'=>'CustomerCategoryController@doAdd'));
+		Route::post('/delete',array('uses'=>'CustomerCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'customer','as'=>'customer'),function()
+	{
+		Route::get('/',array('uses'=>'CustomerController@index'));
+		Route::post('/get_data',array('uses'=>'CustomerController@getData'));
+		Route::get('/add',array('uses'=>'CustomerController@add'));
+		Route::post('/New',array('uses'=>'CustomerController@doAdd'));
+		Route::get('/edit/{id_produk}',array('uses'=>'CustomerController@edit'));
+		Route::post('/Edit',array('uses'=>'CustomerController@doEdit'));
+		Route::post('/delete',array('uses'=>'CustomerController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'CustomerController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'project_category','as'=>'product_category'),function()
+	{
+		Route::get('/',array('uses'=>'ProjectCategoryController@index'));
+		Route::post('/get_data',array('uses'=>'ProjectCategoryController@getData'));
+		Route::post('/add',array('uses'=>'ProjectCategoryController@doAdd'));
+		Route::post('/delete',array('uses'=>'ProjectCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'project','as'=>'project'),function()
+	{
+		Route::get('/',array('uses'=>'ProjectController@index'));
+		Route::post('/get_data',array('uses'=>'ProjectController@getData'));
+		Route::get('/add',array('uses'=>'ProjectController@Add'));
+		Route::post('/New',array('uses'=>'ProjectController@doAdd'));
+		Route::get('/edit/{id_produk}',array('uses'=>'ProjectController@edit'));
+		Route::post('/Edit',array('uses'=>'ProjectController@doEdit'));
+		Route::post('/delete',array('uses'=>'ProjectController@doDelete'));
+		
+		Route::get('/overview/{id_project}',array('uses'=>'ProjectController@showOverview'));
+		Route::get('/timeline/{id_project}',array('uses'=>'ProjectTimelineController@index'));
+		Route::get('/quotation/{id_project}',array('uses'=>'ProjectQTController@index'));
+		Route::get('/sales/{id_project}',array('uses'=>'ProjectSalesController@index'));
+		Route::get('/bom/{id_project}',array('uses'=>'ProjectBoMController@index'));
+		Route::get('/attachment/{id_project}',array('uses'=>'ProjectAttachmentController@index'));
+		
+		Route::post('/get_row', array('uses' => 'ProjectController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'open_project','as'=>'open_project'),function()
+	{
+		Route::get('/',array('uses'=>'OpenProjectController@index'));
+		Route::post('/get_data',array('uses'=>'OpenProjectController@getData'));
+	});
+
+	Route::group(array('prefix'=>'sales','as'=>'sales'),function()
+	{			
+		/* Modul Invoice & Tax */
+		Route::get('/invoice',array('uses'=>'SalesInvoiceController@index'));
+		Route::get('/invoice/detail/{id_trx}',array('uses'=>'SalesInvoiceController@showDetail'));
+		Route::post('/invoice/get_data',array('uses'=>'SalesInvoiceController@getData'));
+		Route::post('/invoice/cancel',array('uses'=>'SalesInvoiceController@doCancel'));
+		
+		Route::get('/invoice/get_select_list', array('uses' => 'SalesInvoiceController@getDataSelect'));
+		Route::post('/invoice/get_row', array('uses' => 'SalesInvoiceController@getRow'));
+		
+		// new
+		Route::get('/invoice/new/',array('uses'=>'SalesInvoiceNewController@index'));
+		
+		Route::post('/invoice/new', array('uses' => 'SalesInvoiceNewController@doProcess'));
+		Route::post('/invoice/new/save', array('uses' => 'SalesInvoiceNewController@doSave'));
+		Route::post('/invoice/new/validate', array('uses' => 'SalesInvoiceNewController@doValidate'));
+		Route::post('/invoice/process_draft', array('uses' => 'SalesInvoiceNewController@index'));
+		
+		/* End Invoice & Tax */
+	});
+
+	Route::group(array('prefix'=>'vendor_category','as'=>'vendor_category'),function()
+	{
+		Route::get('/',array('uses'=>'VendorCategoryController@index'));
+		Route::post('/get_data',array('uses'=>'VendorCategoryController@getData'));
+		Route::post('/add',array('uses'=>'VendorCategoryController@doAdd'));
+		Route::post('/delete',array('uses'=>'VendorCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'vendor','as'=>'vendor'),function()
+	{
+		Route::get('/',array('uses'=>'VendorController@index'));
+		Route::post('/get_data',array('uses'=>'VendorController@getData'));
+		Route::post('/add',array('uses'=>'VendorController@doAdd'));
+		Route::post('/edit',array('uses'=>'VendorController@doEdit'));
+		Route::post('/delete',array('uses'=>'VendorController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'VendorController@getRow'));
+	});
+	
+	Route::group(array('prefix'=>'purchase','as'=>'purchase'),function()
+	{		
+		/* Modul Request */
+		Route::get('/request',array('uses'=>'PurchaseRequestController@index'));
+		Route::get('/request/detail/{id_trx}',array('uses'=>'PurchaseRequestController@showDetail'));
+		Route::post('/request/get_data',array('uses'=>'PurchaseRequestController@getData'));
+		Route::post('/request/cancel',array('uses'=>'PurchaseRequestController@doCancel'));
+		
+		Route::get('/request/get_select_list', array('uses' => 'PurchaseRequestController@getDataSelect'));
+		Route::post('/request/get_row', array('uses' => 'PurchaseRequestController@getRow'));
+		
+		// new
+		Route::get('/request/new/',array('uses'=>'PurchaseRequestNewController@index'));
+		
+		Route::post('/request/new', array('uses' => 'PurchaseRequestNewController@doProcess'));
+		Route::post('/request/new/save', array('uses' => 'PurchaseRequestNewController@doSave'));
+		Route::post('/request/new/validate', array('uses' => 'PurchaseRequestNewController@doValidate'));
+		
+		/* End Request  */
+		
+		/* Modul Order */
+		Route::get('/order',array('uses'=>'PurchaseOrderController@index'));
+		Route::get('/order/detail/{id_trx}',array('uses'=>'PurchaseOrderController@showDetail'));
+		Route::post('/order/get_data',array('uses'=>'PurchaseOrderController@getData'));
+		Route::post('/order/cancel',array('uses'=>'PurchaseOrderController@doCancel'));
+		
+		Route::get('/order/get_select_list', array('uses' => 'PurchaseOrderController@getDataSelect'));
+		Route::post('/order/get_row', array('uses' => 'PurchaseOrderController@getRow'));
+		
+		// new
+		Route::get('/order/new/',array('uses'=>'PurchaseOrderNewController@index'));
+		
+		Route::post('/order/new', array('uses' => 'PurchaseOrderNewController@doProcess'));
+		Route::post('/order/new/save', array('uses' => 'PurchaseOrderNewController@doSave'));
+		Route::post('/order/new/validate', array('uses' => 'PurchaseOrderNewController@doValidate'));
+		
+		/* End Order */
+		
+		/* Modul Invoice */
+		Route::get('/invoice',array('uses'=>'PurchaseInvoiceController@index'));
+		Route::get('/invoice/detail/{id_trx}',array('uses'=>'PurchaseInvoiceController@showDetail'));
+		Route::post('/invoice/get_data',array('uses'=>'PurchaseInvoiceController@getData'));
+		Route::post('/invoice/cancel',array('uses'=>'PurchaseInvoiceController@doCancel'));
+		
+		Route::get('/invoice/get_select_list', array('uses' => 'PurchaseInvoiceController@getDataSelect'));
+		Route::post('/invoice/get_row', array('uses' => 'PurchaseInvoiceController@getRow'));
+		
+		// new
+		Route::get('/invoice/new/',array('uses'=>'PurchaseInvoiceNewController@index'));
+		
+		Route::post('/invoice/new', array('uses' => 'PurchaseInvoiceNewController@doProcess'));
+		Route::post('/invoice/new/save', array('uses' => 'PurchaseInvoiceNewController@doSave'));
+		Route::post('/invoice/new/validate', array('uses' => 'PurchaseInvoiceNewController@doValidate'));
+		
+		/* End Invoice  */
+	});
+
+	Route::group(array('prefix'=>'warehouse','as'=>'warehouse'),function()
+	{
+		Route::get('/',array('uses'=>'WarehouseController@index'));
+		Route::post('/get_data',array('uses'=>'WarehouseController@getData'));
+		Route::post('/add',array('uses'=>'WarehouseController@doAdd'));
+		Route::post('/edit',array('uses'=>'WarehouseController@doEdit'));
+		Route::post('/delete',array('uses'=>'WarehouseController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'WarehouseController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'item_category','as'=>'item_category'),function()
+	{
+		Route::get('/',array('uses'=>'ItemCategoryController@index'));
+		Route::post('/get_data',array('uses'=>'ItemCategoryController@getData'));
+		Route::post('/add',array('uses'=>'ItemCategoryController@doAdd'));
+		Route::post('/delete',array('uses'=>'ItemCategoryController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'item_brand','as'=>'item_brand'),function()
+	{
+		Route::get('/',array('uses'=>'ItemBrandController@index'));
+		Route::post('/get_data',array('uses'=>'ItemBrandController@getData'));
+		Route::post('/add',array('uses'=>'ItemBrandController@doAdd'));
+		Route::post('/delete',array('uses'=>'ItemBrandController@doDelete'));
+	});
+
+	Route::group(array('prefix'=>'item','as'=>'item'),function()
+	{
+		Route::get('/',array('uses'=>'ItemController@index'));
+		Route::post('/get_data',array('uses'=>'ItemController@getData'));
+		Route::post('/add',array('uses'=>'ItemController@doAdd'));
+		Route::post('/edit',array('uses'=>'ItemController@doEdit'));
+		Route::post('/delete',array('uses'=>'ItemController@doDelete'));
+		
+		Route::post('/get_row', array('uses' => 'ItemController@getRow'));
+	});
+
+	Route::group(array('prefix'=>'inventory','as'=>'inventory'),function()
+	{
+		/* Modul Data */
+		Route::get('/data',array('uses'=>'InventoryController@index'));
+		Route::post('/data/get_data',array('uses'=>'InventoryController@getData'));
+		Route::get('/data/card/{id_produk}/{stok_min}/{stok_akhir}',array('uses'=>'InventoryController@showInventoryCard'));
+		Route::post('/data/card/get_stock_card/{id_produk}',array('uses'=>'InventoryController@getDataInventoryCard'));
+		
+		Route::get('/get_select_list', array('uses' => 'InventoryController@getDataSelect'));
+		Route::post('/get_row', array('uses' => 'InventoryController@getRow'));
+		/* Modul Data  */
+		
+		/* Modul Opname */
+		Route::get('/opname',array('uses'=>'StockOpnameController@index'));
+		Route::get('/opname/detail/{id_trx}',array('uses'=>'StockOpnameController@showDetail'));
+		Route::post('/opname/get_data',array('uses'=>'StockOpnameController@getData'));
+		Route::post('/opname/cancel',array('uses'=>'StockOpnameController@doCancel'));
+		
+		Route::get('/opname/get_select_list', array('uses' => 'StockOpnameController@getDataSelect'));
+		Route::post('/opname/get_row', array('uses' => 'StockOpnameController@getRow'));
+		
+		// new
+		Route::get('/opname/new/',array('uses'=>'StockOpnameNewController@index'));
+		
+		Route::post('/opname/new', array('uses' => 'StockOpnameNewController@doProcess'));
+		Route::post('/opname/new/save', array('uses' => 'StockOpnameNewController@doSave'));
+		Route::post('/opname/new/validate', array('uses' => 'StockOpnameNewController@doValidate'));
+		
+		/* End Opname */
+		
+		/* Modul Transfer */
+		Route::get('/transfer',array('uses'=>'StockTransferController@index'));
+		Route::get('/transfer/detail/{id_trx}',array('uses'=>'StockTransferController@showDetail'));
+		Route::post('/transfer/get_data',array('uses'=>'StockTransferController@getData'));
+		Route::post('/transfer/cancel',array('uses'=>'StockTransferController@doCancel'));
+		
+		Route::get('/transfer/get_select_list', array('uses' => 'StockTransferController@getDataSelect'));
+		Route::post('/transfer/get_row', array('uses' => 'StockTransferController@getRow'));
+		
+		// new
+		Route::get('/transfer/new/',array('uses'=>'StockTransferNewController@index'));
+		
+		Route::post('/transfer/new', array('uses' => 'StockTransferNewController@doProcess'));
+		Route::post('/transfer/new/save', array('uses' => 'StockTransferNewController@doSave'));
+		Route::post('/transfer/new/validate', array('uses' => 'StockTransferNewController@doValidate'));
+		
+		/* End Transfer */
+		
+		/* Modul Good Receipt */
+		Route::get('/good_receipt',array('uses'=>'GoodReceiptController@index'));
+		Route::get('/good_receipt/detail/{id_trx}',array('uses'=>'GoodReceiptController@showDetail'));
+		Route::post('/good_receipt/get_data',array('uses'=>'GoodReceiptController@getData'));
+		Route::post('/good_receipt/cancel',array('uses'=>'GoodReceiptController@doCancel'));
+		
+		Route::get('/good_receipt/get_select_list', array('uses' => 'GoodReceiptController@getDataSelect'));
+		Route::post('/good_receipt/get_row', array('uses' => 'GoodReceiptController@getRow'));
+		
+		// new
+		
+		Route::get('/good_receipt/new/',array('uses'=>'GoodReceiptNewController@index'));
+		
+		Route::post('/good_receipt/new', array('uses' => 'GoodReceiptNewController@doProcess'));
+		Route::post('/good_receipt/new/save', array('uses' => 'GoodReceiptNewController@doSave'));
+		Route::post('/good_receipt/new/validate', array('uses' => 'GoodReceiptNewController@doValidate'));
+		
+		/* End Good Receipt */
+		
+		/* Modul Order */
+		Route::get('/delivery_order',array('uses'=>'DeliveryOrderController@index'));
+		Route::get('/delivery_order/detail/{id_trx}',array('uses'=>'DeliveryOrderController@showDetail'));
+		Route::post('/delivery_order/get_data',array('uses'=>'DeliveryOrderController@getData'));
+		Route::post('/delivery_order/cancel',array('uses'=>'DeliveryOrderController@doCancel'));
+		
+		Route::get('/delivery_order/get_select_list', array('uses' => 'DeliveryOrderController@getDataSelect'));
+		Route::post('/delivery_order/get_row', array('uses' => 'DeliveryOrderController@getRow'));
+		
+		// new
+		Route::get('/delivery_order/new/',array('uses'=>'DeliveryOrderNewController@index'));
+		
+		Route::post('/delivery_order/new', array('uses' => 'DeliveryOrderNewController@doProcess'));
+		Route::post('/delivery_order/new/save', array('uses' => 'DeliveryOrderNewController@doSave'));
+		Route::post('/delivery_order/new/validate', array('uses' => 'DeliveryOrderNewController@doValidate'));
+		
+		/* End Order */
+		
+		/* Modul Report */
+		// Route::get('/report',array('uses'=>'StockOpnameController@index'));
+		// Route::post('/report/get_data',array('uses'=>'StockOpnameController@getData'));
+		/* Modul Report */
+	});
+
+	Route::group(array('prefix'=>'request','as'=>'request'),function()
+	{
+		/* Modul Request Advance */
+		Route::get('/advance',array('uses'=>'RequestAdvanceController@index'));
+
+		Route::post('/advance', array('uses' => 'RequestAdvanceController@doProcess'));
+		Route::post('/advance/save', array('uses' => 'RequestAdvanceController@doSave'));
+		Route::post('/advance/validate', array('uses' => 'RequestAdvanceController@doValidate'));
+		/* End Modul Request Advance */
+		
+		/* Modul Request Expense */
+		Route::get('/expense',array('uses'=>'RequestExpenseController@index'));
+
+		Route::post('/expense', array('uses' => 'RequestExpenseController@doProcess'));
+		Route::post('/expense/save', array('uses' => 'RequestExpenseController@doSave'));
+		Route::post('/expense/validate', array('uses' => 'RequestExpenseController@doValidate'));
+		/* End Modul Request Expense */
+		
+		/* Modul Request Overtime */
+		Route::get('/overtime',array('uses'=>'RequestOvertimeController@index'));
+
+		Route::post('/overtime', array('uses' => 'RequestOvertimeController@doProcess'));
+		Route::post('/overtime/save', array('uses' => 'RequestOvertimeController@doSave'));
+		Route::post('/overtime/validate', array('uses' => 'RequestOvertimeController@doValidate'));
+		/* End Modul Request Overtime */
+		
+		/* Modul Waiting Approval */
+		Route::get('/waiting_approval',array('uses'=>'RequestApprovalController@index'));
+		Route::get('/waiting_approval/detail/{id_req}',array('uses'=>'RequestApprovalController@showDetail'));
+		Route::post('/waiting_approval/get_data',array('uses'=>'RequestApprovalController@getData'));
+		Route::post('/waiting_approval/cancel',array('uses'=>'RequestApprovalController@doCancel'));
+		
+		Route::post('/waiting_approval/save', array('uses' => 'RequestApprovalController@doSave'));
+		Route::post('/waiting_approval/validate', array('uses' => 'RequestApprovalController@doValidate'));
+		
+		/* End Waiting Approval */
+		
+		/* Modul Waiting Release */
+		Route::get('/waiting_release',array('uses'=>'RequestReleaseController@index'));
+		Route::get('/waiting_release/detail/{id_req}',array('uses'=>'RequestReleaseController@showDetail'));
+		Route::post('/waiting_release/get_data',array('uses'=>'RequestReleaseController@getData'));
+		Route::post('/waiting_release/cancel',array('uses'=>'RequestReleaseController@doCancel'));
+		
+		Route::post('/waiting_release/save', array('uses' => 'RequestReleaseController@doSave'));
+		Route::post('/waiting_release/validate', array('uses' => 'RequestReleaseController@doValidate'));
+		
+		/* End Waiting Release */
+	});
+
+	Route::group(array('prefix'=>'accounting','as'=>'accounting'),function()
+	{
+		/* Modul COA */
+		Route::get('/coa',array('uses'=>'COAController@index'));
+		Route::post('/coa/get_data',array('uses'=>'COAController@getData'));
+		Route::post('/coa/add',array('uses'=>'COAController@doAdd'));
+		Route::post('/coa/delete',array('uses'=>'COAController@doDelete'));
+		
+		Route::post('/coa/get_row', array('uses' => 'COAController@getRow'));
+		/* End COA */
+
+		/* Modul Currency */
+		Route::get('/currency',array('uses'=>'CurrencyController@index'));
+		Route::post('/currency/get_data',array('uses'=>'CurrencyController@getData'));
+		Route::post('/currency/add',array('uses'=>'CurrencyController@doAdd'));
+		Route::post('/currency/edit',array('uses'=>'CurrencyController@doEdit'));
+		Route::post('/currency/delete',array('uses'=>'CurrencyController@doDelete'));
+		
+		Route::post('/currency/get_row', array('uses' => 'CurrencyController@getRow'));
+		/* End Currency */
+		
+		/* Modul Cash Adjustment */
+		Route::get('/cash_adjustment',array('uses'=>'CashAdjustmentController@index'));
+
+		Route::post('/cash_adjustment', array('uses' => 'CashAdjustmentController@doProcess'));
+		Route::post('/cash_adjustment/save', array('uses' => 'CashAdjustmentController@doSave'));
+		Route::post('/cash_adjustment/validate', array('uses' => 'CashAdjustmentController@doValidate'));
+		/* End Modul Cash Adjustment */
+		
+		/* Modul Cash/Bank Transfer */
+		Route::get('/cashbank_transfer',array('uses'=>'CashBankTransferController@index'));
+
+		Route::post('/cashbank_transfer', array('uses' => 'CashBankTransferController@doProcess'));
+		Route::post('/cashbank_transfer/save', array('uses' => 'CashBankTransferController@doSave'));
+		Route::post('/cashbank_transfer/validate', array('uses' => 'CashBankTransferController@doValidate'));
+		/* End Modul Cash Adjustment */
+		
+		/* Modul Bank Reconciliation */
+		Route::get('/bank_recon',array('uses'=>'BankReconController@index'));
+
+		Route::post('/bank_recon', array('uses' => 'BankReconController@doProcess'));
+		Route::post('/bank_recon/save', array('uses' => 'BankReconController@doSave'));
+		Route::post('/bank_recon/validate', array('uses' => 'BankReconController@doValidate'));
+		/* End Modul Bank Reconciliation */
+		
+		/* Modul Deposits */
+		Route::get('/deposits',array('uses'=>'DepositsController@index'));
+
+		Route::post('/deposits', array('uses' => 'DepositsController@doProcess'));
+		Route::post('/deposits/save', array('uses' => 'DepositsController@doSave'));
+		Route::post('/deposits/validate', array('uses' => 'DepositsController@doValidate'));
+		/* End Modul Deposits */
+		
+		/* Modul Payments */
+		Route::get('/payments',array('uses'=>'PaymentsController@index'));
+
+		Route::post('/payments', array('uses' => 'PaymentsController@doProcess'));
+		Route::post('/payments/save', array('uses' => 'PaymentsController@doSave'));
+		Route::post('/payments/validate', array('uses' => 'PaymentsController@doValidate'));
+		/* End Modul Payments */
+		
+		/* Modul Account Receivable */
+		Route::get('/acct_receivable',array('uses'=>'AcctReceivableController@index'));
+		Route::get('/acct_receivable/detail/{id_trx}',array('uses'=>'AcctReceivableController@showDetail'));
+		Route::post('/acct_receivable/get_data',array('uses'=>'AcctReceivableController@getData'));
+		Route::post('/acct_receivable/cancel',array('uses'=>'AcctReceivableController@doCancel'));
+		
+		// new
+		Route::get('/acct_receivable/new/',array('uses'=>'AcctReceivableNewController@index'));
+		
+		Route::post('/acct_receivable/new', array('uses' => 'AcctReceivableNewController@doProcess'));
+		Route::post('/acct_receivable/new/save', array('uses' => 'AcctReceivableNewController@doSave'));
+		Route::post('/acct_receivable/new/validate', array('uses' => 'AcctReceivableNewController@doValidate'));
+		
+		/* End Account Receivable */
+		
+		/* Modul Account Payable */
+		Route::get('/acct_payable',array('uses'=>'AcctPayableController@index'));
+		Route::get('/acct_payable/detail/{id_trx}',array('uses'=>'AcctPayableController@showDetail'));
+		Route::post('/acct_payable/get_data',array('uses'=>'AcctPayableController@getData'));
+		Route::post('/acct_payable/cancel',array('uses'=>'AcctPayableController@doCancel'));
+		
+		// new
+		Route::get('/acct_payable/new/',array('uses'=>'AcctPayableNewController@index'));
+		
+		Route::post('/acct_payable/new', array('uses' => 'AcctPayableNewController@doProcess'));
+		Route::post('/acct_payable/new/save', array('uses' => 'AcctPayableNewController@doSave'));
+		Route::post('/acct_payable/new/validate', array('uses' => 'AcctPayableNewController@doValidate'));
+		
+		/* End Account Payable */
+		
+		/* Modul Memorial Jurnal */
+		Route::get('/memorial_journal',array('uses'=>'MemorialJournalController@index'));
+
+		Route::post('/memorial_journal', array('uses' => 'MemorialJournalController@doProcess'));
+		Route::post('/memorial_journal/save', array('uses' => 'MemorialJournalController@doSave'));
+		Route::post('/memorial_journal/validate', array('uses' => 'MemorialJournalController@doValidate'));
+		/* End Modul Memorial Jurnal */
+		
+		/* Modul Report */
+		
+			/* Modul General Journal */
+			Route::get('/report/general_journal',array('uses'=>'GeneralJournalController@index'));
+			Route::post('/report/general_journal',array('uses'=>'GeneralJournalController@showReport'));
+			/* End General Journal  */
+		
+			/* Modul Balance Sheet */
+			Route::get('/report/balance_sheet',array('uses'=>'BalanceSheetController@index'));
+			Route::post('/report/balance_sheet',array('uses'=>'BalanceSheetController@showReport'));
+			/* End Balance Sheet */
+		
+			/* Modul Trial Balance */
+			Route::get('/report/trial_balance',array('uses'=>'TrialBalanceController@index'));
+			Route::post('/report/trial_balance',array('uses'=>'TrialBalanceController@showReport'));
+			/* End Trial Balance */
+		
+			/* Modul Profit Loss */
+			Route::get('/report/profit_loss',array('uses'=>'ProfitLossController@index'));
+			Route::post('/report/profit_loss',array('uses'=>'ProfitLossController@showReport'));
+			/* End Profit Loss */
+		
+			/* Modul General Ledger */
+			Route::get('/report/general_ledger',array('uses'=>'GeneralLedgerController@index'));
+			Route::post('/report/general_ledger',array('uses'=>'GeneralLedgerController@showReport'));
+			/* End General Ledger  */
+			
+		/* End Report */
+	});
+
+	Route::group(array('prefix'=>'user_group','as'=>'user_group'),function()
+	{
+		
+		Route::get('',array('before'=>'privilege:user_group,view','uses'=>'UserGroupController@index'));
+		Route::get('/detail/{id_trx}',array('before'=>'privilege:user_group,view','uses'=>'UserGroupController@showDetail'));
+		Route::post('/get_data',array('uses'=>'UserGroupController@getData'));
+			
+		Route::get('/new/',array('before'=>'privilege:user_group,new','uses'=>'UserGroupController@showNewEdit'));
+		
+		Route::get('/edit/{id_group}',array('before'=>'privilege:user_group,edit','uses'=>'UserGroupController@showNewEdit'));
+			
+		Route::post('/delete',array('before'=>'privilege:user_group,delete','uses'=>'UserGroupController@doDelete'));
+		
+		Route::post('/save', array('uses' => 'UserGroupController@doSave'));
+		Route::post('/validate', array('uses' => 'UserGroupController@doValidate'));
+	});
+
+	Route::group(array('prefix'=>'user_account','as'=>'user_account'),function()
+	{
+		Route::get('/',array('uses'=>'UserAccountController@index'));
+		Route::get('/detail/{id_trx}',array('uses'=>'UserAccountController@showDetail'));
+		Route::post('/get_data',array('uses'=>'UserAccountController@getData'));
+		Route::post('/cancel',array('uses'=>'UserAccountController@doCancel'));
+		
+		Route::get('/get_select_list', array('uses' => 'UserAccountController@getDataSelect'));
+		Route::post('/get_row', array('uses' => 'UserAccountController@getRow'));
+		
+		// new
+		Route::get('/new/',array('uses'=>'UserAccountNewController@index'));
+		
+		Route::post('/new', array('uses' => 'UserAccountNewController@doProcess'));
+		Route::post('/new/save', array('uses' => 'UserAccountNewController@doSave'));
+		Route::post('/new/validate', array('uses' => 'UserAccountNewController@doValidate'));
+	});
+});
+
+Route::post('/datatables/{module}',array('uses'=>'DataTableController@ajax'));
+
+/*-------------------------------------------------------------------------------------------------
+BACK END ROUTING
+---------------------------------------------------------------------------------------------------*/
+
+if(Request::is('admin/*') or Request::is('admin')){
+
+    require __DIR__.'/routes_admin.php';
+}
+
+/*-------------------------------------------------------------------------------------------------
+BLADE EXTENTION
+---------------------------------------------------------------------------------------------------*/
+
+Blade::extend(function($value)
+{
+	$replace = array('@break', '@continue');
+	$to = array('<?php break; ?>', '<?php continue; ?>');
+	return str_replace($replace, $to, $value);
+});

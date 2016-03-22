@@ -1,0 +1,143 @@
+<?php
+
+class WarehouseModel {
+ 
+        protected $_table = 'm_warehouse';
+	protected $_id = 'id_warehouse';
+        
+        
+        public function getData($filter, $limit, $offset, $sortBy, $sortDir)
+	{
+		$data['id'] = $this->_id;
+	
+		$tableColumn = array($this->_id, 'warehouse_name', 'address','head_person');
+		
+		$query = DB::table($this->_table." as a")
+						->select(array($this->_id, 'a.warehouse_name AS warehouse_name', 'a.address AS address','b.emp_firstname AS head_person'))
+                                                ->leftJoin('hs_hr_employee as b', 'a.head_person', '=', 'b.emp_number')
+						->where('a.is_deleted',0)
+						->where('a.owner', Crypt::decrypt(Session::get('owner')));
+		
+		$data['count'] = $data['filter_count'] = $query->count();
+		
+		if($filter)
+		{
+			if($filter['warehouse_name'])
+				$query->where('warehouse_name', 'LIKE', '%'.$filter['warehouse_name'].'%');
+			if($filter['address'])
+				$query->where('address', 'LIKE', '%'.$filter['address'].'%');
+                        if($filter['head_person']!='')
+				$query->where('a.head_person', '=', $filter['head_person']);
+			
+				
+			$data['filter_count'] = $query->count();
+		}
+		
+		$data['data'] = $query->orderBy($tableColumn[$sortBy],$sortDir)->skip($offset)->take($limit)->get();
+		
+		return $data;
+	}
+
+	public function getDataRow($id_warehuse)
+	{
+		$id_warehouse = decode($warehouse);
+		$data['id'] = $this->_id;
+		$tableColumn = array($this->_id, 'warehouse_name', 'description','head_person');
+		
+		$data = DB::table($this->_table)
+						->select($tableColumn)
+						->where('id_warehouse',$id_warehuse)
+						->first();
+	
+		
+		return $data;
+	}
+        
+        public function getDetail($id)
+	{
+		$query = DB::table($this->_table)
+						->select('*')
+						->where('is_deleted',0)
+						->where('id_warehouse',$id)
+						->where('owner', Crypt::decrypt(Session::get('owner')));
+		
+		$data = $query->first();
+
+		return $data;
+	}
+        
+        
+        
+        public function insertData($data)
+	{
+        $insertArr = array(
+
+            'owner' => Crypt::decrypt(Session::get('owner')),
+            'warehouse_name'	=> $data['warehouse_name'],
+            'address'	=> $data['address'],
+            'head_person'	=> $data['head_person'],
+            'description'	=> $data['description'],
+            'created_by' => Session::get('user_name'),
+            'created_at'=> DB::raw('now()')
+
+        );
+       
+        return DB::table($this->_table)->insertGetId($insertArr);
+	}
+        
+        public function updateData($data)
+	{
+		if(empty($data['id'])) return 'Data Not Found';
+		try
+		{
+			DB::beginTransaction();
+			$update = array(
+				'head_person'=> $data['head_person'],
+				'address'=> $data['address'],
+				'warehouse_name'=> $data['warehouse_name'],
+				'description'=> $data['description'],
+				'updated_by' => Session::get('user_name'),
+				'updated_at'=> DB::raw('now()')
+			);
+
+		   DB::table($this->_table)->where($this->_id,$data['id'])->update($update);
+
+		   DB::commit();
+		}catch(Exception $e)
+		{
+			DB::rollback();
+			return $e->getMessage();
+		}
+        return true;
+	}
+        
+        
+        public function deleteData($id)
+	{
+            $updateArr = array(
+
+            'is_deleted'	=> 1,
+            'updated_by' => Session::get('user_name'),
+            'updated_at'=> DB::raw('now()'),
+            'deleted_at'=> DB::raw('now()')
+        );
+
+        return DB::table($this->_table)
+							->where($this->_id,$id)
+							->update($updateArr);
+	
+        }
+        
+        public function hasStock($id)
+	{
+		$data = DB::table('t_item_stock')
+						->select('id_warehouse')
+						->where($this->_id,$id)
+						->where('owner', Crypt::decrypt(Session::get('owner')))
+						->where('is_deleted',0)
+						->get();
+       
+        return $data;
+	}
+    
+}

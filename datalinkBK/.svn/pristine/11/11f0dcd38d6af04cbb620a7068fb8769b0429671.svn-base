@@ -1,0 +1,242 @@
+<?php
+/*
+ * @author :  Indra Octama 
+ * @date : 24 November 2014
+ * @purpose : Warehouse Controller 
+ */
+
+class WarehouseController extends BaseController 
+{
+        protected $_defaultModel = 'WarehouseModel';
+	protected $_pageTitle = 'Warehouse';
+	protected $_menuId = 'warehouse';
+    
+	public function __construct()
+	{
+        
+        }
+        
+        public function index()
+	{
+            $getHeadPerson = GeneralModel::getSelectionList2('hs_hr_employee','emp_number','emp_firstname');
+            
+		$param = array(
+                                'title'			=> $this->_pageTitle,
+                                'title_desc'	=> 'warehouse_list',
+                                'menu_id'		=> $this->_menuId,
+                                'list_head_person'     => array('' => '-- Pilih --') + $getHeadPerson,
+                        );
+            return View::make('modules.warehouse.index',$param);
+        }
+        
+        public function getData()
+	{
+		if(Request::ajax()){
+		
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			$iDisplayLength = intval($param['length']);
+			$limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+			$offset = intval($param['start']);
+			$draw = intval($param['draw']);
+			$sortBy = $param['order'][0]['column'];
+			$sortDir = $param['order'][0]['dir'];
+			$filter = isset($param['filter']) ? $param['filter'] : array();
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+			
+			$data = array();
+			$n = $offset + 1;
+			foreach($get['data'] as $key=>$r)
+			{
+				$row = $r;
+				$row->id = $r->$get['id'];
+				unset($row->$get['id']);
+				
+			
+				$ubah = $hapus = '';
+				if($privi['edit']) 
+					$ubah = '<a href="'.URL::to('/').'/warehouse/edit/'.encode($row->id).'" class="btn btn-xs purple tooltips" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+				if($privi['delete'])
+					$hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+				
+				$row->action = '<div>'.$ubah.$hapus.'</div>';
+				$row->no = $n;
+				
+				$data[$key] = $row;
+				
+				$n++;
+			}
+			
+			$records["data"] = $get['data'];
+			$records["draw"] = $draw;
+			$records["recordsTotal"] = $get['count'];
+			$records["recordsFiltered"] = $get['filter_count'];;
+			
+			echo json_encode($records);
+		
+		}
+	}
+        
+        
+        public function add()
+	{
+            
+		$getHeadPerson = GeneralModel::getSelectionList2('hs_hr_employee','emp_number','emp_firstname');
+		
+		$param = array(
+						'title'					=> $this->_pageTitle,
+						'title_desc'		=> 'Warehouse',
+						'menu_id'		=> $this->_menuId,
+						'act'					=> 'New',
+						'list_head_person'     => array('' => '-- Pilih --') + $getHeadPerson,
+					);
+		return View::make('modules.warehouse.add',$param);
+	}
+        
+        
+        public function doAdd()
+	{
+            $input = Input::all();
+
+
+            $rules = array(
+                                                    'warehouse_name'	        => 'required',
+                                                    'address' 			=> 'required',
+                                                    'head_person'               => 'required',
+                                              );
+
+            $validator = Validator::make($input, $rules);
+
+            if($validator->fails())
+                    {    
+                            $errorArr = array();
+                            foreach($rules as $key=>$row)
+                            {
+                                    $errorArr[$key] = $validator->messages()->first($key);
+                            }
+
+                            $ret = array(
+                                                    'status'		=> false,
+                                                    'alert_msg'	=> 'Terdapat error. Mohon dicek kembali.',
+                                                    'error_msg'	=> $errorArr
+                                            );
+            }    
+            else
+                    {                                    
+                            $model = new $this->_defaultModel;
+                            $id = $model->insertData($input);
+
+                            $alert = isset($input['from']) ? 'Warehouse' : 'Data';
+                            if($id)
+                            {
+                                    $ret = array(
+                                                            'status'		=> true,
+                                                            'alert_msg'	=> $alert.' berhasil ditambah.',
+                                                            'error_msg'	=> array(),
+                                                            'id'				=> $id
+                                                    );
+                            }
+                            else
+                            {
+                                    $ret = array(
+                                                            'status'		=> false,
+                                                            'alert_msg'	=> $alert.' gagal ditambah. Silakan hubungi Customer Support.',
+                                                            'error_msg'	=> array()
+                                                    );
+                            }        
+            } //end of validator
+
+                    echo json_encode($ret);
+    }
+    
+    
+    public function edit($idwarehouse)
+	{
+        
+		$idwarehouse = decode($idwarehouse);
+
+		$model = new $this->_defaultModel;
+		$getDetail = $model->getDetail($idwarehouse);
+                
+		if(!$getDetail)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		} 
+		
+		$getHeadPerson = GeneralModel::getSelectionList2('hs_hr_employee','emp_number','emp_firstname');
+		
+		$param = array(
+						'title'					=> $this->_pageTitle,
+						'title_desc'		=> 'Project',
+						'menu_id'		=> $this->_menuId,
+						'act'					=> 'Edit',
+						'list_head_person'     => array('' => '-- Pilih --') + $getHeadPerson,
+                                                'warehouse'            => $getDetail,
+						'idWarehouse'			=> $idwarehouse,
+					);
+		return View::make('modules.warehouse.add',$param);
+	}
+
+    public function doEdit()
+	{
+		$input = Input::all();
+
+		$rules = array(
+                                                    'warehouse_name'	        => 'required',
+                                                    'address' 			=> 'required',
+                                                    'head_person'               => 'required',
+                                              );
+                
+		$validator = Validator::make($input, $rules);
+
+		if($validator->fails())
+		{
+			$errorArr = array();
+			foreach($rules as $key=>$row)
+			{
+				$errorArr[$key] = $validator->messages()->first($key);
+			}
+			
+			$ret = array(
+						'status'		=> false,
+						'alert_msg'	=> 'Terdapat error. Mohon dicek kembali.',
+						'error_msg'	=> $errorArr
+					);
+		}    
+		else
+		{                                    
+			$model = new $this->_defaultModel;
+			$return = $model->updateData($input);
+
+			if($return === true)
+			{
+				$ret = array(
+							'status'		=> true,
+							'alert_msg'	=> 'Successfully updated.',
+							'error_msg'	=> $return,
+						);
+			}
+			else
+			{
+				$ret = array(
+							'status'		=> false,
+							'alert_msg'	=> 'Data gagal ditambah. Silakan hubungi project Support.',
+							'error_msg'	=> $return
+						);
+			}
+		}//end of validator
+		
+		echo json_encode($ret);
+    }
+        
+    
+}

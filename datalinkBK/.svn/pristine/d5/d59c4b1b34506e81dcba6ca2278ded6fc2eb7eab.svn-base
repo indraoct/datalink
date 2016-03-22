@@ -1,0 +1,33 @@
+@extends('layouts.global')
+
+@section('css')
+	<!-- BEGIN PAGE LEVEL STYLES -->
+	<link href="{{ URL::asset('/assets/admin/pages/css/error.css') }}" rel="stylesheet" type="text/css"/>
+	<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+	<script>
+		jQuery(document).ready(function() {     
+			Metronic.init(); // init metronic core components
+			Layout.init(); // init current layout
+		});
+	</script>
+@stop
+
+@section('content')
+	<div class="row">
+		<div class="col-md-12 page-404">
+			<div class="number">
+				 404
+			</div>
+			<div class="details">
+				<h3>Oops! Anda tersesat.</h3>
+				<p>
+					Kami tidak dapat menemukan halaman yang Anda cari.<br/>
+					Kembali ke <a href="{{ URL::to('/') }}">beranda</a>
+				</p>
+			</div>
+		</div>
+	</div>
+@stop

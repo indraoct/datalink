@@ -1,0 +1,191 @@
+<?php
+
+class InventoryController extends BaseController 
+{
+	protected $_defaultModel = 'InventoryModel';
+	protected $_pageTitle = 'View Stock';
+	protected $_menuId = 'view_stock';
+    
+	public function __construct()
+	{
+        
+        }
+        
+        public function index(){
+            
+            $listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+            
+            $param = array(
+							'title'			=> $this->_pageTitle,
+							'title_desc'	=> 'Inventory',
+							'menu_id'		=> $this->_menuId,
+                                                        'listWarehouse' => array('' => '-- Please Select --') + $listWarehouse,
+						);
+            
+            
+            
+            return View::make('modules.inventory.index',$param);
+        }
+        
+        public function getData(){
+            
+            if(Request::ajax()){
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			$iDisplayLength = intval($param['length']);
+			$limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+			$offset = intval($param['start']);
+			$draw = intval($param['draw']);
+			$sortBy = $param['order'][0]['column'];
+			$sortDir = $param['order'][0]['dir'];
+			$filter = isset($param['filter']) ? $param['filter'] : array();
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+			
+			$data = array();
+			$n = $offset + 1;
+			foreach($get['data'] as $key=>$r)
+			{
+				$row = $r;
+				
+				$row->id = $r->$get['id'];
+				unset($row->$get['id']);
+                                
+                                $row->item_name_link = '<a href="'.URL::to('/').'/inventory/data/card/'.encode($row->id).'" class="show_detail">'.$r->item_name.'</a> ';
+				
+				$hapus = '';
+				if($privi['delete'])
+					$hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+				
+				$row->action = '<div>'.$hapus.'</div>';
+				$row->no = $n;
+				
+				$data[$key] = $row;
+				
+				$n++;
+			}
+			
+			$records["data"] = $get['data'];
+			$records["draw"] = $draw;
+			$records["recordsTotal"] = $get['count'];
+			$records["recordsFiltered"] = $get['filter_count'];;
+			
+			echo json_encode($records);
+		
+		}
+            
+        }
+        
+        
+        public function showInventoryCard($id_stock){
+            
+            $id_stock = decode($id_stock);
+            
+            $model = new $this->_defaultModel;
+		$getDetail = $model->getDetail($id_stock);
+
+		if(!$getDetail)
+		{
+			$param = array(
+								'title'			=> 'Page 404',
+								'menu_id'		=> 'missing'
+							);
+			return Response::view('errors.missing_admin', $param, 404);
+		} 
+		$listWarehouse 	= GeneralModel::getSelectionList('m_warehouse','id_warehouse','warehouse_name');
+		
+                
+                
+                $param = array(
+						'title'					=> 'Stock Card',
+						'title_desc'		=> '',
+						'menu_id'		=> $this->_menuId,
+                                                'listWarehouse'	=> array('' => '-- Please Select --') + $listWarehouse,
+                                                'inventory' => $getDetail['inventory'],
+					);
+                
+                
+		return View::make('modules.inventory.card',$param);
+             
+             
+            
+        }
+        
+        public function getDataInventoryCard (){
+            if(Request::ajax()){
+			$privi['edit'] = hasPrivilege($this->_menuId,'edit');
+			$privi['delete'] = hasPrivilege($this->_menuId,'delete');
+		
+			$param = Input::all();
+			
+			$iDisplayLength = intval($param['length']);
+			$limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength; 
+			$offset = intval($param['start']);
+			$draw = intval($param['draw']);
+			$sortBy = $param['order'][0]['column'];
+			$sortDir = $param['order'][0]['dir'];
+			$filter = isset($param['filter']) ? $param['filter'] : array();
+			
+			$model = new $this->_defaultModel;
+			$get = $model->getDataStock($filter, $limit, $offset, $sortBy, $sortDir);
+			
+			$data = array();
+			$n = $offset + 1;
+			foreach($get['data'] as $key=>$r)
+			{
+				$row = $r;
+				
+				$row->id = $r->$get['id'];
+				unset($row->$get['id']);
+                               
+			
+				$row->no = $n;
+                                $row->trx_date = displayDate($r->trx_date);
+                                $row->capital_price = displayNumeric($r->capital_price);
+                                $row->stock_in = displayNumeric($r->stock_in);
+                                $row->stock_out = displayNumeric($r->stock_out);
+                                $row->remaining_stock = displayNumeric($r->remaining_stock);
+                                $row->balance = displayNumeric($r->balance);
+
+				
+				$data[$key] = $row;
+				
+				$n++;
+			}
+			
+			$records["data"] = $get['data'];
+			$records["draw"] = $draw;
+			$records["recordsTotal"] = $get['count'];
+			$records["recordsFiltered"] = $get['filter_count'];;
+		
+                       
+			echo json_encode($records);
+            
+            }
+        }
+        
+         public function getDataTambahan(){
+            
+            if(Request::ajax()){
+                $id_item = $_POST['id_item'];
+                $id_warehouse = $_POST['id_warehouse'];
+                $model = new $this->_defaultModel;
+                
+                $get = $model->getDataTambahan($id_item,$id_warehouse);
+                
+                $get['tambahan']->stock_initial = displayNumeric($get['tambahan']->stock_initial); 
+                $get['tambahan']->stock_in = displayNumeric($get['tambahan']->stock_in); 
+                $get['tambahan']->stock_out = displayNumeric($get['tambahan']->stock_out); 
+                $get['tambahan']->remaining_stock = displayNumeric($get['tambahan']->remaining_stock); 
+                $get['tambahan']->balance = displayNumeric($get['tambahan']->balance); 
+                
+                
+                echo json_encode($get);
+            }
+           
+        }
+}   

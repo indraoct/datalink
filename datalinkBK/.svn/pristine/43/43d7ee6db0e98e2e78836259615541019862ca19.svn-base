@@ -1,0 +1,52 @@
+<?php
+
+class GeneralModel 
+{
+	public static function getSelectionList($table, $idCol, $nameCol, $whereArr=null)
+	{			
+		$query = DB::table($table)
+						->select($idCol,$nameCol)
+						->where('is_deleted',0)
+						->where('owner', Crypt::decrypt(Session::get('owner')));
+		
+		if($whereArr)
+		{
+			foreach($whereArr as $col=>$val)
+			{
+				$opval = explode(' ',$val);
+				$query->where($col,$opval[0],$opval[1]);
+			}
+		}
+		$data = $query->orderBy($nameCol)->get();
+		
+		return listArray($data,$idCol, $nameCol);
+	}
+
+	public static function getCcy()
+	{			
+		$query = DB::table('hs_hr_currency_type')
+						->select('code','currency_id');
+		$data = $query->orderBy('currency_id')->get();
+		
+		return listArray($data,'code', 'currency_id');
+	}
+
+	public static function getSelection($table, $idCol, $nameCol, $whereArr=null)
+	{			
+		$query = DB::table($table)
+						->select($idCol,$nameCol);
+		
+		if($whereArr)
+		{
+			foreach($whereArr as $col=>$val)
+			{
+				$opval = explode(' ',$val);
+				$query->where($col,$opval[0],$opval[1]);
+			}
+		}
+		$data = $query->orderBy($nameCol)->get();
+
+		return listArray($data,$idCol, $nameCol);
+	}
+	
+}

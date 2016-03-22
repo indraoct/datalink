@@ -1,0 +1,587 @@
+@extends('layouts.admin.default')
+
+@section('css')
+<!-- BEGIN PAGE LEVEL STYLES -->
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+<!-- BEGIN PAGE LEVEL PLUGINS -->
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/moment.min.js') }}"></script>
+<!-- END PAGE LEVEL PLUGINS -->
+<script>
+
+function construct() {
+    /* DEFINE ELEMENT & OPTIONS HERE */
+    var i = 0;
+    if (jQuery().datepicker) {
+        $('.date-picker').datepicker({
+            rtl: Metronic.isRTL(),
+            orientation: "left",
+            autoclose: true
+        });
+    //$('body').removeClass("modal-open"); // fix bug when inline picker is used in modal
+    }
+    $("#global_type_disc").change(function() {
+        recalculate();
+    });
+    // select items
+    var itemsColumns = [
+                        { cTitle: "Kode/Barcode", cName: "item_code", cClass: "", cSize: 3 },
+                        { cTitle: "Nama", cName: "item_name", cClass: "", cSize: 6 },
+                        { cTitle: "Harga Satuan", cName: "harga_jual_view", cClass: "alignRight", cSize: 3 }
+                        ];
+    $("#search_item").select2({
+        placeholder: "Type product code or product name or barcode",
+        allowClear: true,
+        minimumInputLength: 2,
+        ajax: {
+            url: '{{ URL::to('/') }}/item/get_list',
+            dataType: 'json',
+            type: "GET",
+            quietMillis: 200,
+            data: function (term) {
+                return {
+                    term: term
+                };
+            },
+            results: function (data) {
+                return {results: data};
+            }
+        },
+        formatResult: function (item) {
+            var text = '<div class="row">';
+            if (item.key === 0) {
+                $.each(itemsColumns, function (i, col) {
+                    text = text + '<div class="col-md-' + col.cSize + ' alignCenter"><strong>' + col.cTitle + '</strong></div>';
+                });
+            }
+            $.each(itemsColumns, function (i, col) {
+                if (item[col.cName] === undefined) {
+                    item[col.cName] = '';
+                }
+                text = text + '<div class="col-md-' + col.cSize + ' ' + col.cClass + '">' + item[col.cName] + '</div>';
+            });
+            return text + '</div>';
+        },
+        formatNoMatches: function(term) {}
+    })
+    .on("change", function(e) {
+        var isExist = false;
+        var $itemRow = {};
+        $('.id_item').each(function (obj) {
+            if ($(this).val() == e.val) {
+                isExist = true;
+                $itemRow = $(this).closest('tr');
+                return false;
+            }
+        });
+        if (isExist) {
+            var oldVal = defaultNumeric($itemRow.find('.qty').val(), {{ numericJS() }});
+            var newVal = displayNumeric(parseFloat(oldVal) + 1, {{ numericJS() }});
+            $itemRow.find('.qty').val(newVal);
+            recalculate();
+            $('#search_item').select2('val', '');
+        } else {
+                            getRowItem(e.val);
+        }
+    })
+    .parent().find('.select2-with-searchbox');
+
+    var lastToast;
+    /* END DEFINE ELEMENT  */
+    /* BEGIN EVENT HANDLER */
+    $(document).on('click', "#full_screen", function() {
+        params = 'width=' + screen.width;
+        params += ', height=' + screen.height;
+        params += ', top=0, left=0'
+        params += ', fullscreen=yes';
+        params += ', scrollbars=yes';
+        newwin = window.open('{{ URL::to(' / ') }}/sales/invoice/new/fullscreen', 'salesInvoiceNew', params);
+        if (window.focus) {
+            newwin.focus()
+        }
+        return false;
+    });
+
+    // datepicker tanggal
+    $('#div_tanggal').datepicker().on('changeDate', function (ev) {
+        var tanggal = $('#tanggal').val();
+        var date = moment(tanggal, '{{ Config::get("format.date.moment") }}').add('day', $('#termin_bayar_c').val());
+        var jatuh_tempo = date.format('{{ Config::get("format.date.moment") }}');
+        $('#jatuh_tempo').val(jatuh_tempo);
+    });
+    // tombol delete row
+    $("#datatable tbody").on('click', "a.delete_row", function() {
+        $(this).parents('tr').remove();
+        recalculate();
+    });
+    // event ketika modal_items ditampilkan
+    $('#modal_items').on('show', function(e) {
+        clearForm('#form_items');
+        clearError();
+    });
+    // tombol proses
+    $(".form").on('click', "#process, #save_draft", function(){
+        validate($(this).attr('id'));
+    });
+    $("#global_disc, #biaya, .qty, .price, .item_disc").keyup(function() {
+        recalculate();
+    });
+    $(".discount_type").change(function() {
+        recalculate();
+    });
+    $("#tax").on('click', function() {
+        recalculate();
+    });
+    /* END EVENT HANDLER */
+
+    /* BEGIN JS FUNCTION */
+    function clearError() {
+        $('.item_row').removeClass('has-error');
+        $('.form-group').removeClass('has-error');
+        $('.form-control').attr('data-original-title', '');
+    }
+    function getRowItem(id) {
+        $.ajax({
+            url: '{{ URL::to('/') }}/item/get_row',
+            dataType: 'json',
+            type: 'POST',
+            data: 'id=' + id,
+            beforeSend: function() {
+                Metronic.blockUI();
+            },
+            success: function(result) {
+                // var result = eval('('+result+')');
+                Metronic.unblockUI();
+                // alert(result);
+                $('#search_item').select2('val', '');
+                insertRowItem(result);
+                recalculate();
+            },
+            error: function(x, h, r) {
+                alert(r);
+            }
+        })
+    }
+    function insertRowItem(data) {
+        var $row = $([
+                '<tr role="row" class="item_row">',
+                '<td><center><a href="javascript:void(0)" class="btn btn-xs red tooltips delete_row" data-original-title="Hapus"><i class="fa fa-times"></i></a></center></td>',
+                '<td><input type="hidden" name="items[' + i + '][id_item]" class="id_item"><input type="hidden" name="items[' + i + '][item_code]" class="item_code"><input type="text" name="items[' + i + '][item_name]" class="form-control input-sm item_name" readonly></td>',
+                '<td><input type="text" name="items[' + i + '][qty]" class="form-control input-sm currency qty"></td>',
+                '<td><input type="hidden" name="items[' + i + '][unit]" class="id_unit">' + data.unit_name + '</td>',
+                '<td><input type="text" name="items[' + i + '][price]" class="form-control input-sm currency price" readonly></td>',
+                '<td><select name="items[' + i + '][discount_type]" class="input-sm discount_type"><option value="%" selected>%</option><option value="N">Rp</option></select></td>',
+                '<td><input type="text" name="items[' + i + '][item_disc]" class="form-control input-sm currency item_disc"></td>',
+                '<td><input type="text" name="items[' + i + '][total_item]" class="form-control input-sm currency total_item" readonly></td>',
+                '</tr>'
+            ].join(''));
+            i++;
+            $row.find(".qty, .price, .item_disc").keyup(function() {
+                recalculate();
+            });
+            $row.find(".discount_type").change(function() {
+                recalculate();
+            });
+            $row.find('.currency').autoNumeric('init', {{ autoNumeric() }});
+            $row.find('.id_item').val(data.id_item);
+            $row.find('.item_code').val(data.item_code);
+            $row.find('.item_name').val(data.item_name);
+            $row.find('.qty').val(1);
+            $row.find('.id_unit').val(data.id_unit);
+            $row.find('.harga_beli').val(displayNumeric(data.harga_beli, {{ numericJS() }}));
+            $row.find('.price').val(displayNumeric(data.cogs_price, {{ numericJS() }}));
+            $('.item_row:last', '#datatable').after($row);
+            // $row.find('.qty').focus();
+    }
+    function recalculate() {
+        var totalBruto = totalDiskonItem = subTotal = totalDiskon = totalPPN = totalNetto = totalModal = total = biaya = 0;
+        var isRugi = 0;
+        var tipeDiscGlobal = $('#global_type_disc').val();
+        var discGlobal = defaultNumeric($("#global_disc").val(), {{ numericJS() }});
+        var biaya = defaultNumeric($("#biaya").val(), {{ numericJS() }});
+        var rowCount = $('.qty').length;
+        var isTax = $("#tax").val($(this)).is(':checked');
+        if (rowCount > 0) {
+            $('#process, #save_draft').removeAttr('disabled');
+            for (n = 0; n < rowCount; n++) {
+                var qty = defaultNumeric($('.qty:eq(' + n + ')').val(), {{ numericJS() }});
+                var discount_type = $('.discount_type:eq(' + n + ')').val();
+                var item_disc = defaultNumeric($('.item_disc:eq(' + n + ')').val(), {{ numericJS() }});
+                var price = defaultNumeric($('.price:eq(' + n + ')').val(), {{ numericJS() }});
+                var harga_beli = defaultNumeric($('.harga_beli:eq(' + n + ')').val(), {{ numericJS() }});
+                totalBruto += (qty * price);
+                if (discount_type == '%') {
+                    item_disc = price * item_disc / 100;
+                }
+                var item_disc = (qty * item_disc);
+                totalDiskonItem += item_disc;
+                var harga_satuan = price - item_disc
+                var total_item = qty * harga_satuan;
+                subTotal += total_item;
+                $('.item_disc:eq(' + n + ')').val(displayNumeric(item_disc, {{ numericJS() }}));
+                $('.harga_satuan:eq(' + n + ')').val(displayNumeric(harga_satuan, {{ numericJS() }}));
+                $('.total_item:eq(' + n + ')').val(displayNumeric(total_item, {{ numericJS() }}));
+                totalModal += (qty * parseFloat(harga_beli));
+                if ((price - item_disc) < harga_beli) {
+                    isRugi = 1;
+                    $('.total_item:eq(' + n + ')').css('border-color', 'red');
+                    $('.total_item:eq(' + n + ')').tooltip().attr('data-original-title', 'Rugi');
+                } else {
+                    $('.total_item:eq(' + n + ')').css('border-color', '');
+                    $('.total_item:eq(' + n + ')').attr('data-original-title', '');
+                }
+            }
+        } else {
+            $('#process, #save_draft').attr('disabled', true);
+        }
+        // penghitungan diskon
+        if (tipeDiscGlobal == '%') {
+            discGlobal = (subTotal * (discGlobal / 100));
+        }
+        totalNetto = subTotal - discGlobal;
+        total = totalNetto + parseFloat(biaya);
+        if (isTax === true) {
+            taxPercent = '10';
+            taxAmount = (subTotal * (taxPercent / 100));
+            total += taxAmount;
+        } else {
+            taxAmount = 0;
+        }
+        if (totalNetto < totalModal) {
+            isRugi = 1;
+            $('.total').css('border-color', 'red');
+            $('.total').tooltip().attr('data-original-title', 'Rugi');
+        } else {
+            $('.total').css('border-color', '');
+            $('.total').attr('data-original-title', '');
+        }
+        $('#hpp').val(displayNumeric(totalModal, {{ numericJS() }}));
+        $('#total_bruto').val(displayNumeric(totalBruto, {{ numericJS() }}));
+        $('#global_disc_total').val(displayNumeric(discGlobal, {{ numericJS() }}));
+        $('#subtotal').val(displayNumeric(subTotal, {{ numericJS() }}));
+        $('#total_diskon').val(displayNumeric(totalDiskon, {{ numericJS() }}));
+        $('#tax_amount').val(displayNumeric(taxAmount, {{ numericJS() }}));
+        $('#total_netto').val(displayNumeric(totalNetto, {{ numericJS() }}));
+        $('.total').val(displayNumeric(total, {{ numericJS() }}));
+        $('#form_total').val(displayNumeric(total, {{ numericJS() }}));
+        if (isRugi == 1) {
+            toastr.clear(lastToast);
+            lastToast = toastr['error']('Nilai transaksi lebih kecil daripada HPP. Mohon cek kolom total.', 'Terjadi kerugian.');
+            $('#process, #save_draft').attr('disabled', 'true');
+        } else {
+            toastr.clear();
+            if (rowCount > 0) {
+                $('#process, #save_draft').removeAttr('disabled');
+            }
+        }
+        $('.currency').each(function (e) {
+            var val = defaultNumeric($(this).val(), {{ numericJS() }});
+            if (val < 0) {
+                $(this).css('color', 'red');
+            } else {
+                $(this).css('color', 'black');
+            }
+        });
+    }
+    function validate(action) {
+        clearError();
+        console.log(action)
+        $.ajax({
+            url: "{{ URL::to('/') }}/purchase/order/new/validate",
+            type: "post",
+            data: $('#form').serialize() + '&action=' + action,
+            beforeSend: function() {
+                Metronic.blockUI();
+            },
+            success: function(result) {
+                var result = eval('(' + result + ')');
+                Metronic.unblockUI();
+                var alert_msg = '';
+                if (result.status) {
+                    $('<input />').attr('type', 'hidden')
+                            .attr('name', 'action')
+                            .attr('value', action)
+                            .appendTo('#form');
+                    $("#form").submit();
+                } else {
+                    toastr['error'](result.alert_msg);
+                    var errors = result.error_msg;
+                    Object.keys(errors).forEach(function(key) {
+                        if (errors[key]) {
+                            if (key == "items") {
+                                Object.keys(errors[key]).forEach(function(n) {
+                                    Object.keys(errors[key][n]).forEach(function(keyP) {
+                                        $('.' + keyP + ':eq(' + n + ')').closest('.item_row').addClass('has-error');
+                                        $('.' + keyP + ':eq(' + n + ')').attr("data-original-title", errors[key][n][keyP]).tooltip();
+                                    });
+                                });
+                            } else {
+                                $('#' + key).addClass('has-error');
+                                $('#' + key).closest('.form-group').addClass('has-error');
+                                $('#' + key).attr("data-original-title", errors[key]).tooltip();
+                                $('#s2id_' + key).attr("data-original-title", errors[key]).tooltip();
+                            }
+                        }
+                    });
+                }
+            },
+            error: function(x, h, r) {
+                alert(r);
+            }
+        })
+    }
+/* END JS FUNCTION */
+};
+jQuery(document).ready(function() {
+    Metronic.init(); // init metronic core components
+    Layout.init(); // init current layout
+    construct();
+    @if (Session::get('alert') == 'success')
+        toastr['success']('{{ Session::get("alert_msg") }}');
+    @endif
+});
+</script>
+@stop
+
+@section('content')
+
+@if(!$is_fullscreen)
+<!-- BEGIN PAGE HEADER-->
+<div class="row">
+    <div class="col-md-12">
+        <!-- BEGIN PAGE TITLE & BREADCRUMB-->
+        <h3 class="page-title">
+            {{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+        </h3>
+        <ul class="page-breadcrumb breadcrumb">
+            <li>
+                <i class="fa fa-home"></i>
+                <a href="#">Procurement</a>
+                <i class="fa fa-angle-right"></i>
+            </li>
+            <li>
+                <a href="#">Purchase Order</a>
+                <i class="fa fa-angle-right"></i>
+            </li>
+            <li>
+                <a href="#">{{{ $title or '' }}}</a>
+            </li>
+        </ul>
+        <!-- END PAGE TITLE & BREADCRUMB-->
+    </div>
+</div>
+<!-- END PAGE HEADER-->
+@endif
+
+<!-- BEGIN PAGE CONTENT-->
+<!-- BEGIN FORM-->
+<form id="form" method="post" action="{{ URL::to('/') }}/purchase/order/new" class="form-horizontal">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="portlet yellow-crusta box">
+                <div class="portlet-title">
+                    <div class="caption"><i class="fa fa-clipboard"></i>PO Detail</div>
+                    <div class="tools">
+                        <a href="javascript:;" class="collapse">
+                        </a>
+                    </div>
+                </div>
+                <div class="portlet-body form">
+                    <div class="form-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">PO No</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('po_no', $po_no, array('id' => 'po_no', 'class' => 'form-control digits', 'readonly' => true, 'maxlength' => 8)) }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Vendor</label>
+                                    <div class="col-md-3">
+                                        {{ Form::select('vendor', $listVendors, null, array('id' => 'vendor', 'class'=>'form-control form-filter select2 input-md')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">PO Date</label>
+                                    <div class="input-group date date-picker col-md-3" data-date-format="{{ Config::get('format.date.default') }}">
+                                        {{ Form::text('po_date', date('d-m-Y'), array('class' => 'form-control form-filter input-sm', 'readonly' => true)) }}
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Address</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('address', '', array('id' => 'address', 'class' => 'form-control form-filter')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Tax</label>
+                                    <div class="col-md-3">
+                                        {{ Form::checkbox('tax', 1, null, array('id' => 'tax', 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">No Ref</label>
+                                    <div class="col-md-3">
+                                        {{ Form::hidden('pr_id', $pr_id, array('id' => 'pr_id')) }}
+                                        {{ Form::text('pr_no', $pr_no, array('id' => 'pr_no', 'class' => 'form-control', 'readonly' => true)) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Currency</label>
+                                    <div class="col-md-3">
+                                        {{ Form::select('currency', $listCurrencies, 'IDR', array('id' => 'currency', 'class'=>'form-control form-filter select2 input-md')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Total</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('form_total', '', array('id' => 'form_total', 'class' => 'form-control', 'readonly' => true)) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Notes</label>
+                                    <div class="col-md-3">
+                                        {{ Form::textarea('notes', '', array('id' => 'po_no', 'rows' => 2, 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="portlet box red">
+                <div class="portlet-title">
+                    <div class="caption"><i class="fa fa-file"></i>Item</div>
+                    <div class="tools">
+                        <a href="javascript:;" class="collapse">
+                        </a>
+                    </div>
+                </div>
+                <div class="portlet-body form">
+                    <div class="form-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label class="control-label col-md-2">Search Item</label>
+                                    <div class="col-md-10">
+                                        {{ Form::text('search_item','',array('id'=>'search_item','class'=>'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!--/row-->
+                        <div class="table-container">
+                            <table class="table table-striped table-bordered table-hover" id="datatable">
+                                <thead>
+                                    <tr role="row" class="heading">
+                                        <th width="5%">#</th>
+                                        <th width="35%">Item Name</th>
+                                        <th colspan="2" width="15%">Qty</th>
+                                        <th width="15%">Price @</th>
+                                        <th colspan="2" width="15%">Disc</th>
+                                        <th width="20%">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr role="row" class="item_row"></tr>
+                                </tbody>
+                                <tfoot>
+                                    <tr role="row">
+                                        <th colspan="4" rowspan="4"></th>
+                                        <th class="alignRight">Subtotal</th>
+                                        <td colspan="2"></td>
+                                        <td>
+                                            {{ Form::hidden('total_bruto', 0, array('id' => 'total_bruto')) }}
+                                            {{ Form::text('subtotal', 0, array('id' => 'subtotal', 'class' => 'form-control currency', 'readonly' => 'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th class="alignRight">Global Diskon</th>
+                                        <td>
+                                            {{ Form::select('global_type_disc', array ('%' => '%', 'N' => 'Rp'), '%', array('id' => 'global_type_disc', 'class'=>'global_type_disc input-sm')) }}
+                                        </td>
+                                        <td class="alignRight">
+                                            {{ Form::text('global_disc', 0, array('id' => 'global_disc', 'class'=>'global_disc form-control input-sm currency')) }}
+                                        </td>
+                                        <td>
+                                            {{ Form::text('global_disc_total', 0, array('id' => 'global_disc_total', 'class'=>'form-control global_disc_total currency', 'readonly'=>'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th class="alignRight">Tax</th>
+                                        <td colspan="2"></td>
+                                        <td>
+                                            {{ Form::text('tax_amount', 0,array('id'=>'tax_amount','class'=>'form-control currency','readonly'=>'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th class="alignRight">Total</th>
+                                        <td colspan="2"></td>
+                                        <td>
+                                            {{ Form::hidden('hpp', 0, array('id' => 'hpp')) }}
+                                            {{ Form::hidden('total_netto', 0, array('id' => 'total_netto')) }}
+                                            {{ Form::text('total', 0, array('class' => 'form-control currency total','readonly'=>'true','style'=>'font-weight:bold;')) }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="form-actions fluid">
+                        <div class="col-md-offset-5 col-md-7">
+                            <button type="button" id="process" class="btn blue">Proses</button>
+                            <a href="{{ URL::to('/') }}/purchase/order/" class="btn red">Back</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<!-- END FORM-->
+
+
+
+<!-- END PAGE CONTENT-->
+@stop

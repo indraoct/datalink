@@ -1,0 +1,441 @@
+<?php
+
+class PurchaseRequestController extends BaseController {
+
+    protected $_defaultModel = 'PurchaseRequestModel';
+    protected $_pageTitle = 'Purchase Request';
+    protected $_menuId = 'purchase_request';
+
+    public function __construct() {
+        
+    }
+
+    public function index() {
+        if (Session::get('action') != 'back')
+            Session::forget('pos');
+
+        Session::forget('action');
+        $param = array(
+            'title' => $this->_pageTitle,
+            'menu_id' => $this->_menuId,
+            'title_desc' => '',
+            'listBom' => GeneralModel::customGetSelectionList('t_project_bom', 'bom_no', 'bom_no', 'BOM-'),
+            'req_l' => GeneralModel::getSelection('hs_hr_employee', 'emp_number', 'emp_firstname'),
+            'new' => hasPrivilege($this->_menuId, 'new'),
+            'back_data' => Session::get('pos')
+        );
+        return View::make('modules.purchase_request.index', $param);
+    }
+
+    public function getData() {
+        if (Request::ajax()) {
+
+            $privi['edit'] = hasPrivilege($this->_menuId, 'edit');
+            $privi['delete'] = hasPrivilege($this->_menuId, 'delete');
+
+            $param = Input::all();
+            $req_l = GeneralModel::getSelection('hs_hr_employee', 'emp_number', 'emp_firstname') + array('' => '-');
+
+            $iDisplayLength = intval($param['length']);
+            $limit = $iDisplayLength < 0 ? $iTotalRecords : $iDisplayLength;
+            $offset = intval($param['start']);
+            $draw = intval($param['draw']);
+            $sortBy = $param['order'][0]['column'];
+            $sortDir = $param['order'][0]['dir'];
+            $filter = isset($param['filter']) ? $param['filter'] : array();
+
+            $model = new $this->_defaultModel;
+            $get = $model->getData($filter, $limit, $offset, $sortBy, $sortDir);
+
+            $data = array();
+            $n = $offset + 1;
+            foreach ($get['data'] as $key => $r) {
+                $row = $r;
+
+                $row->id = $r->$get['id'];
+                unset($row->$get['id']);
+
+                $ubah = $hapus = '';
+                if ($privi['edit'])
+                    $ubah = '<a href="' . URL::to('/') . '/request/detail/' . encode($row->id) . '" class="btn btn-xs purple tooltips show_edit" data-original-title="Edit" ><i class="fa fa-pencil"></i></a> ';
+                if ($privi['delete'])
+                    $hapus = '<a href="javascript:;" class="btn btn-xs red tooltips do_delete" data-original-title="Hapus"><i class="fa fa-trash-o"></i></a> ';
+
+                $row->action = '<div>' . $ubah . $hapus . '</div>';
+                $row->no = $n;
+                $row->pr_date = displayDate($r->pr_date);
+                $row->pr_nums = "<a href='" . URL::to('/') . '/purchase/request/detail/' . $row->pr_no . "'>PR-$row->pr_no</a>";
+                $row->requestor = $req_l[$row->requestor];
+
+                $data[$key] = $row;
+
+                $n++;
+            }
+
+            $records["data"] = $get['data'];
+            $records["draw"] = $draw;
+            $records["recordsTotal"] = $get['count'];
+            $records["recordsFiltered"] = $get['filter_count'];
+
+
+            echo json_encode($records);
+        }
+    }
+    
+    public function getDetail($id) {
+        $d = GeneralModel::getTable('t_purchase_request', array('pr_no' => "= $id"))->first();
+        $detail = GeneralModel::getTable('t_purchase_request_detail', array('id_pr' => "= $d->id_pr"))->get();
+        $lPurpose = array(1 => 'Minimum Stock', 2 => 'Project');
+        $req_l = GeneralModel::getSelection('hs_hr_employee', 'emp_number', 'emp_firstname');
+        if ($d->purpose == 1) {
+            $project_name = '';
+            $bom = '';
+            $id_project = '';
+        } else {
+            $get_bom = substr($d->ref_no, 4);
+            $p = GeneralModel::getTable('t_project_bom', array('bom_no' => "= $get_bom"))->first();
+            $p_id = GeneralModel::getTable('m_project', array('id_project' => "= $p->id_project"))->first();
+
+            $id_project = $p->id_project;
+            $project_name = "$p_id->project_name";
+            $bom = "BOM-$get_bom";
+        }
+
+        $param = array(
+            'title' => 'Detail Purchase Request',
+            'title_desc' => '',
+            'menu_id' => $this->_menuId,
+            'lpurpose' => $lPurpose,
+            'lreq' => $req_l,
+            'purpose' => $d->purpose,
+            'pr_no' => "PR-$d->pr_no",
+            'pr_tgl' => displayDate($d->pr_date),
+            'notes' => $d->notes,
+            'requestor' => $d->requestor,
+            'project_name' => $project_name,
+            'bom' => $bom,
+            'id_project' => $id_project,
+            'detail' => $detail
+        );
+
+        return View::make('modules.purchase_request.detail', $param);
+    }
+
+    public function addNew() {
+        //Session::forget('purchase_request');
+        $s_purpose = Input::get('purpose');
+        $s_bom = Input::get('bom');
+        Redirect::to('purchase/request/new')->with('s_purpose', $s_purpose)
+                ->with('s_bom', $s_bom);
+    }
+
+    public function add() {
+        //Session::forget('purchase_request');
+        $lPurpose = array(1 => 'Minimum Stock', 2 => 'Project');
+        $get_bom = Input::get('bom');
+        $p = GeneralModel::getTable('t_project_bom', array('bom_no' => "= $get_bom"))->first();
+        $p_id = GeneralModel::getTable('m_project', array('id_project' => "= $p->id_project"))->first();
+        if (Input::get('purpose') == 1) {
+            $project_name = '';
+            $bom = '';
+            $id_project = '';
+        } else {
+            $id_project = $p->id_project;
+            $project_name = "$p_id->project_name";
+            $bom = "BOM-$get_bom";
+        }
+
+        $param = array(
+            'title' => 'New Purchase Request',
+            'title_desc' => '',
+            'menu_id' => $this->_menuId,
+            'lpurpose' => $lPurpose,
+            'purpose' => Input::get('purpose'),
+            'pr_no' => 'PR-' . GeneralModel::getPRNo(),
+            'pr_tgl' => date("d-m-Y"),
+            'requestor' => GeneralModel::getSelection('hs_hr_employee', 'emp_number', 'emp_firstname'),
+            'project_name' => $project_name,
+            'bom' => $bom,
+            'id_project' => $id_project,
+        );
+        return View::make('modules.purchase_request.add1', $param);
+    }
+
+    public function getDataSelect() {
+
+        $term = Input::get('term');
+
+        $query = DB::table('m_item')
+                ->where('item_code', 'LIKE', '%' . $term . '%')
+                ->orWhere('item_name', 'LIKE', '%' . $term . '%')
+                ->where('is_stockable', '1');
+
+        $get['data'] = $query->orderBy('item_name')->take(100)->get();
+
+        $data = array();
+
+        foreach ($get['data'] as $key => $r) {
+            $row = $r;
+            $data[] = $row;
+        }
+
+        echo json_encode($data);
+    }
+
+    
+
+    public function getRow() {
+        if (Request::ajax()) {
+
+            $id = Input::get('id');
+            $item = GeneralModel::getTable('m_item', array('item_code' => "= $id"))->first();
+
+            $stock = DB::table('t_item_stock')
+                    ->select(DB::raw('SUM( stock_initial + stock_in - stock_out ) as total'))
+                    ->where('id_item', '=', $item->id_item)
+                    ->first();
+
+            $unit = GeneralModel::getTable('m_item_unit', array('id_unit' => "= $item->id_unit"))->first();
+
+            $data['id_item'] = $item->id_item;
+            $data['nama_item'] = $item->item_name;
+            $data['item_stock'] = displayNumeric($stock->total) . ' Unit';
+            $data['item_min'] = displayNumeric($item->min_stock) . ' Unit';
+            $data['item_qty'] = displayNumeric(1);
+            $data['unit'] = $unit->unit_name;
+
+
+            $item_arr = array(
+                'id_list' => $item->id_item,
+                'name_list' => $item->item_name,
+                'stock_list' => displayNumeric($stock->total),
+                'min_list' => displayNumeric($item->min_stock),
+                'qty_list' => displayNumeric(1),
+                'item_desc' => $item->description,
+                'item_unit' => $unit->unit_name
+            );
+
+            //Session::forget('purchase_request');
+            if (Session::has('purchase_request')) {
+                $pre = Session::get('purchase_request');
+                $ada = 0;
+                foreach ($pre as $pr) {
+                    if ($pr['id_list'] == $item->id_item) {
+                        $ada = 1;
+                    }
+                }
+
+                if ($ada == 0) {
+                    $data['item_ada'] = '0';
+                    Session::push('purchase_request', $item_arr);
+                } else {
+                    $data['item_ada'] = '1';
+                }
+            } else {
+                $data['item_ada'] = '0';
+                Session::push('purchase_request', $item_arr);
+            }
+
+            echo json_encode($data);
+        }
+    }
+
+    public function cekSession() {
+
+        if (Session::has('purchase_request')) {
+            $pre = Session::get('purchase_request');
+            if ($pre > 0) {
+                $data['item_ada'] = 1;
+            } else {
+                $data['item_ada'] = 0;
+            }
+        } else {
+            $data['item_ada'] = 0;
+        }
+        echo json_encode($data);
+    }
+
+    public function delRow() {
+        $id = Input::get('id');
+
+        $new_arr = array();
+        $pre = Session::get('purchase_request');
+        Session::forget('purchase_request');
+
+        foreach ($pre as $pr) {
+            if ($pr['id_list'] != $id) {
+                $new_arr = array(
+                    'id_list' => $pr['id_list'],
+                    'name_list' => $pr['name_list'],
+                    'stock_list' => $pr['stock_list'],
+                    'min_list' => $pr['min_list'],
+                    'qty_list' => $pr['qty_list'],
+                    'item_desc' => $pr['item_desc'],
+                    'item_unit' => $pr['item_unit']
+                );
+                Session::push('purchase_request', $new_arr);
+            }
+        }
+    }
+
+    public function updateRow() {
+        $id = Input::get('id');
+        $qty = defaultNumeric(Input::get('qty'));
+        $new_arr = array();
+        $pre = Session::get('purchase_request');
+        Session::forget('purchase_request');
+
+        foreach ($pre as $pr) {
+            if ($pr['id_list'] == $id) {
+                $new_arr = array(
+                    'id_list' => $pr['id_list'],
+                    'name_list' => $pr['name_list'],
+                    'stock_list' => $pr['stock_list'],
+                    'min_list' => $pr['min_list'],
+                    'qty_list' => displayNumeric($qty),
+                    'item_desc' => $pr['item_desc'],
+                    'item_unit' => $pr['item_unit']
+                );
+                Session::push('purchase_request', $new_arr);
+            } else {
+                $new_arr = array(
+                    'id_list' => $pr['id_list'],
+                    'name_list' => $pr['name_list'],
+                    'stock_list' => $pr['stock_list'],
+                    'min_list' => $pr['min_list'],
+                    'qty_list' => $pr['qty_list'],
+                    'item_desc' => $pr['item_desc'],
+                    'item_unit' => $pr['item_unit']
+                );
+                Session::push('purchase_request', $new_arr);
+            }
+        }
+    }
+
+    public function konfirmasi() {
+        $input = Input::all();
+        $lPurpose = array(1 => 'Minimum Stock', 2 => 'Project');
+        $req_l = GeneralModel::getSelection('hs_hr_employee', 'emp_number', 'emp_firstname');
+        if ($input['purpose'] == 1) {
+            $project_name = '';
+            $bom = '';
+            $id_project = '';
+        } else {
+            $get_bom = substr($input['bom'], 4);
+            $p = GeneralModel::getTable('t_project_bom', array('bom_no' => "= $get_bom"))->first();
+            $p_id = GeneralModel::getTable('m_project', array('id_project' => "= $p->id_project"))->first();
+
+            $id_project = $p->id_project;
+            $project_name = "$p_id->project_name";
+            $bom = "BOM-$get_bom";
+        }
+
+        $param = array(
+            'title' => 'New Purchase Request',
+            'title_desc' => '',
+            'menu_id' => $this->_menuId,
+            'lpurpose' => $lPurpose,
+            'lreq' => $req_l,
+            'purpose' => $input['purpose'],
+            'pr_no' => substr($input['pr_no'], 3),
+            'pr_tgl' => $input['tanggal'],
+            'notes' => $input['notes'],
+            'requestor' => $input['requestor'],
+            'project_name' => $project_name,
+            'bom' => $bom,
+            'id_project' => $id_project,
+        );
+
+        return View::make('modules.purchase_request.add_konf', $param);
+    }
+
+    public function insertData() {
+        $input = Input::all();
+        if (Session::has('purchase_request')) {
+            $bom = $input['bom'];
+            $data = array(
+                'owner' => Crypt::decrypt(Session::get('owner')),
+                'pr_no' => $input['pr_no'],
+                'pr_date' => defaultDate($input['tanggal']),
+                'notes' => $input['notes'],
+                'requestor' => $input['requestor'],
+                'purpose' => $input['purpose'],
+                'id_project' => $input['id_project'],
+                'project_name' => $input['project_name'],
+                'ref_no' => $input['bom'],
+                'status' => 0,
+                'is_deleted' => 0,
+                'created_by' => Session::get('user_name'),
+                'created_at' => DB::raw('now()')
+            );
+            $id = DB::table('t_purchase_request')->insertGetId($data);
+            //$id = GeneralModel::insertData('t_purchase_request', $data)->lastInsertId();
+
+            $pre = Session::get('purchase_request');
+            foreach ($pre as $pr) {
+                $data_s = array(
+                    'id_pr' => $id,
+                    'id_detail_bom' => $bom,
+                    'id_item' => $pr['id_list'],
+                    'item_name' => $pr['name_list'],
+                    'item_desc' => $pr['item_desc'],
+                    'qty_request' => defaultNumeric($pr['qty_list']),
+                    'qty_processed' => '',
+                    'item_unit' => $pr['item_unit']
+                );
+                $return = GeneralModel::insertData('t_purchase_request_detail', $data_s);
+            }
+        }
+        Session::forget('purchase_request');
+
+
+//        $rules = $this->rules();
+//        $validator = Validator::make($input, $rules);
+//        if ($validator->fails()) {
+//            $errorArr = array();
+//            foreach ($rules as $key => $row) {
+//                $errorArr[$key] = $validator->messages()->first($key);
+//            }
+//
+//            $ret = array(
+//                'status' => false,
+//                'alert_msg' => 'Error occured. Please check again.',
+//                'error_msg' => $errorArr
+//            );
+//        } else {
+//            $data = array(
+//                'owner' => Crypt::decrypt(Session::get('owner')),
+//                'pr_no' => $input['pr_no'],
+//                'pr_date' => $input['tanggal'],
+//                'notes' => $input['notes'],
+//                'requestor' => $input['requestor'],
+//                'purpose' => $input['purpose'],
+//                'id_project' => $input['id_project'],
+//                'project_name' => $input['project_name'],
+//                'ref_no' => $input['bom'],
+//                'status' => 0,
+//                'is_deleted' => 0,
+//                'created_by' => Session::get('user_name'),
+//                'created_at' => DB::raw('now()')
+//            );
+//            $return = GeneralModel::insertData('t_purchase_request', $data);
+//
+        if ($return === true) {
+            $ret = array(
+                'status' => true,
+                'alert_msg' => 'Successfully added.',
+                'error_msg' => $return,
+            );
+        } else {
+            $ret = array(
+                'status' => false,
+                'alert_msg' => 'Addition failed. Please contact your administrator.',
+                'error_msg' => $return
+            );
+        }
+
+        echo json_encode($ret);
+//        return Redirect::to('purchase/request')->with($alertArr);
+    }
+
+}

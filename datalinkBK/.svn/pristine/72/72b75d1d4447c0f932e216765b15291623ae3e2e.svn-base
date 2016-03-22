@@ -1,0 +1,221 @@
+<?php
+
+class PurchaseOrderNewController extends BaseController {
+
+    protected $_defaultModel = 'PurchaseOrderModel';
+    protected $_pageTitle = 'New Purchase Order';
+    protected $_menuId = 'purchase-order';
+
+    public function __construct() {
+        
+    }
+
+    public function index() {
+        $pr_id = Input::get('pr_id');
+
+        if (Input::get('id_trx')) {
+            $new = false;
+            $model = new $this->_defaultModel;
+            $data = $model->getDetailInvoice(Input::get('id_trx'));
+
+            $data['no_faktur'] = $pr_id;
+            $data['no_isauto'] = true;
+            $data['tanggal'] = displayDate($data['tanggal']);
+            $data['salesman'] = $data['id_salesman'];
+            $data['customer'] = $data['id_customer'];
+            $data['termin_bayar_c'] = $data['termin_bayar'];
+            $data['jatuh_tempo'] = displayDate($data['jatuh_tempo']);
+            $data['alamat_tagih'] = $data['alamat_penagihan'];
+            $data['alamat_kirim'] = $data['alamat_pengiriman'];
+            $data['diskon_global'] = displayNumeric($data['diskon_global']);
+            $data['total_bruto'] = displayNumeric($data['total_bruto']);
+            $data['sub_total'] = displayNumeric($data['sub_total']);
+            $data['total_diskon_item'] = displayNumeric($data['total_diskon_item']);
+            $data['total_diskon'] = displayNumeric($data['total_diskon_global']);
+            $data['hpp'] = displayNumeric($data['hpp']);
+            $data['total_netto'] = displayNumeric($data['total_netto']);
+            $data['biaya'] = displayNumeric($data['biaya']);
+            $data['total'] = displayNumeric($data['total']);
+
+            foreach ($data['produk'] as $key => $row) {
+                $data['produk'][$key]['qty'] = displayNumeric($row['qty']);
+                $data['produk'][$key]['harga_satuan'] = displayNumeric($row['harga_satuan']);
+                $data['produk'][$key]['harga_beli'] = displayNumeric($row['harga_beli']);
+                $data['produk'][$key]['harga_jual'] = displayNumeric($row['harga_jual']);
+                $data['produk'][$key]['diskon_item'] = displayNumeric($row['potongan_harga']);
+                $data['produk'][$key]['diskon'] = displayNumeric($row['diskon']);
+                $data['produk'][$key]['total_item'] = displayNumeric($row['total_item']);
+            }
+        } else {
+            if (Session::get('action') != 'back') {
+                Session::forget('invoice');
+            }
+
+            Session::forget('action');
+            $data = Session::get('invoice');
+            $new = isset($data['new']) ? $data['new'] : true;
+        }
+
+        $listSalesman = array('' => '-- Pilih --');
+        $listCustomer = array('' => '-- Pilih --');
+        $listKategori = array('' => '-- Pilih --');
+        $listSatuan = array('' => '-- Pilih --');
+        $listTermin = Config::get('globalvar.termin_bayar');
+
+        $param = array(
+            'title' => $new ? $this->_pageTitle : 'Proses Draft',
+            'title_desc' => 'create new purchase order',
+            'menu_id' => $this->_menuId,
+            'is_fullscreen' => false,
+            'po_no' => '',
+            'no_faktur' => $pr_id,
+            'no_auto' => $pr_id,
+            'no_isauto' => true,
+            'list_kategori' => $listKategori,
+            'list_satuan' => $listSatuan,
+            'list_salesman' => $listSalesman,
+            'list_customer' => $listCustomer,
+            'list_termin' => $listTermin,
+            'listVendors' => array('' => '-- select --') + GeneralModel::getSelectionList('m_vendor', 'id_vendor', 'vendor_name'),
+            'listCurrencies' => array('' => '-- select --') + GeneralModel::getSelectionList2('m_currency', 'id_ccy', 'ccy_code'),
+            'new' => $new,
+            'data' => $data
+        );
+
+        return View::make('modules.purchase_order.new.index')->with($param);
+    }
+
+    public function doValidate() {
+        $input = Input::all();
+        $validate = true;
+
+        $errorArr = array();
+        $alertMsg = 'Terdapat error. Mohon dicek kembali.';
+
+        $rules = array(
+            'no_faktur' => 'required|digits:6|unique:t_trx_jual,no_faktur,NULL,id_trx,canceled,0',
+            'customer' => 'required|numeric',
+        );
+
+        $validator = Validator::make($input, $rules);
+        if ($validator->fails()) {
+            foreach ($rules as $key => $row) {
+                $errorArr[$key] = $validator->messages()->first($key);
+            }
+            $validate = false;
+        }
+
+        if (isset($input['produk'])) {
+            $i = 0;
+            foreach ($input['produk'] as $rowP) {
+                $rowP['qty'] = defaultNumeric($rowP['qty']);
+                $rulesP = array(
+                    'qty' => 'required|numeric'
+                );
+                $validatorP = Validator::make($rowP, $rulesP);
+                if ($validatorP->fails()) {
+                    foreach ($rulesP as $key => $row) {
+                        $errorArr['produk'][$i][$key] = $validatorP->messages()->first($key);
+                    }
+                    $validate = false;
+                }
+                $i++;
+            }
+        } else {
+            $validate = false;
+            $alertMsg = 'Harap pilih produk';
+        }
+
+        if (!$validate) {
+            $ret = array(
+                'status' => false,
+                'alert_msg' => $alertMsg,
+                'error_msg' => $errorArr
+            );
+        } else {
+            $ret = array(
+                'status' => true,
+                'alert_msg' => '',
+                'error_msg' => array()
+            );
+        } //end of validator
+
+        echo json_encode($ret);
+    }
+
+    public function doProcess() {
+        $input = Input::all();
+
+        $title = $this->_pageTitle;
+        $title_desc = 'create new purchase order';
+
+        $param = array(
+            'title' => $title . ' - Konfirmasi',
+            'title_desc' => $title_desc,
+            'menu_id' => $this->_menuId,
+        );
+
+        $input['no_isauto'] = isset($input['no_isauto']) ? true : false;
+
+        if ($input['no_isauto'])
+            $input['no_faktur'] = SalesInvoiceModel::getNoInvoice();
+
+        Session::put('invoice', $input);
+
+        if ($input['action'] == 'process') {
+            $customerModel = new CustomerModel;
+            $customerData = $customerModel->getRow($input['customer']);
+            $input['nama_customer'] = $customerData->nama_customer;
+
+            if ($input['salesman']) {
+                $salesmanModel = new SalesmanModel;
+                $salesmanData = $salesmanModel->getRow($input['salesman']);
+                $input['nama_sales'] = $salesmanData->nama_sales;
+            } else
+                $input['nama_sales'] = '-';
+
+            $param = array_merge($param, $input);
+
+            $this->layout = View::make('layouts.admin.default')->with($param);
+            if ($input['is_fullscreen'])
+                $this->layout = View::make('layouts.admin.popup')->with($param);
+            $this->layout->content = View::make('frontend.sales_invoice.new.confirm')->with($param);
+            return $this->layout;
+        }
+        else {
+            $this->doSave();
+
+            if ($input['is_fullscreen'])
+                $url = 'sales/invoice/new/fullscreen';
+            else
+                $url = 'sales/invoice/new';
+
+            $alertArr = array(
+                'alert' => 'success',
+                'alert_msg' => 'Transaksi berhasil disimpan sebagai Draft.',
+            );
+            return Redirect::to($url)->with($alertArr);
+        }
+    }
+
+    public function doSave() {
+        $data = Session::get('invoice');
+        $data['action'] = Input::get('action') ? Input::get('action') : $data['action'];
+
+        if ($data['action'] == 'process' || $data['action'] == 'save_draft') {
+            $model = new $this->_defaultModel;
+            $id_trx = $model->insertDataInvoice($data);
+
+            Session::forget('invoice');
+            Session::forget('action');
+
+            $alertArr = array(
+                'alert' => 'success',
+                'alert_msg' => 'Transaksi berhasil diproses.',
+            );
+            return Redirect::to('sales/invoice/detail/' . encode($id_trx))->with($alertArr);
+        } else
+            return Redirect::to('sales/invoice/new')->with('action', 'back');
+    }
+
+}

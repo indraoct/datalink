@@ -1,0 +1,1021 @@
+@extends('layouts.admin.default')
+
+@section('css')
+<!-- BEGIN PAGE LEVEL STYLES -->
+<link href="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/css/datepicker3.css') }}" rel="stylesheet" type="text/css"/>
+<!-- END PAGE LEVEL SCRIPTS -->
+@stop
+
+@section('js')
+<!-- BEGIN PAGE LEVEL PLUGINS -->
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootbox/bootbox.min.js') }}"></script>
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/bootstrap-datepicker/js/bootstrap-datepicker.js') }}"></script>
+<script type="text/javascript" src="{{ URL::asset('/assets/global/plugins/moment.min.js') }}"></script>
+<!-- END PAGE LEVEL PLUGINS -->
+<script>
+
+        function construct() {
+
+        /* DEFINE ELEMENT & OPTIONS HERE */
+        var i = 0;
+<?php
+if (isset($data)) {
+    $no_isauto = $data['no_isauto'];
+    echo "
+                                var i = " . count($data['produk']) . ";
+                                recalculate();
+                        ";
+} else {
+    echo "
+                                var i = 0;
+                                $('#process, #save_draft').attr('disabled', 'true');
+                        ";
+}
+
+$no_isauto = isset($data) ? $data['no_isauto'] : $no_isauto;
+?>
+
+        @if ($no_isauto)
+                $('#no_faktur').attr('readonly', true);
+                $('#no_isauto').prop('checked');
+                @endif
+
+                if (jQuery().datepicker) {
+        $('.date-picker').datepicker({
+        rtl: Metronic.isRTL(),
+                orientation: "left",
+                autoclose: true
+        });
+                //$('body').removeClass("modal-open"); // fix bug when inline picker is used in modal
+        }
+
+        $("#tipe_diskon_global").change(function() {
+        recalculate();
+        });
+                // select produk
+                var produkColumns = [
+                    { cTitle: "Kode/Barcode", cName: "item_code", cClass: "", cSize: 3 },
+                    { cTitle: "Nama", cName: "item_name", cClass: "", cSize: 6 },
+                    { cTitle: "Harga Satuan", cName: "harga_jual_view", cClass: "alignRight", cSize: 3 }
+                ];
+                $("#search_item").select2({
+                    placeholder: "Type product code or product name or barcode",
+                    allowClear: true,
+                    minimumInputLength: 2,
+                    ajax: {
+                    url: '{{ URL::to('/') }}/item/get_list',
+                        dataType: 'json',
+                        type: "GET",
+                        quietMillis: 200,
+                        data: function (term) {
+                            return {
+                                term: term
+                            };
+                        },
+                        results: function (data) {
+                            return {results: data};
+                        }
+                    },
+                    formatResult: function (item) {
+                        var text = '<div class="row">';
+                        if (item.key === 0) {
+                            $.each(produkColumns, function (i, col) {
+                                text = text + '<div class="col-md-' + col.cSize + ' alignCenter"><strong>' + col.cTitle + '</strong></div>';
+                            });
+                        }
+
+                        $.each(produkColumns, function (i, col) {
+                            if (item[col.cName] === undefined) {
+                                item[col.cName] = '';
+                            }
+                            text = text + '<div class="col-md-' + col.cSize + ' ' + col.cClass + '">' + item[col.cName] + '</div>';
+                        });
+                        return text + '</div>';
+                    },
+                    formatNoMatches: function(term) {
+//                return '<input class="form-control" id="new_produk" value="' + term + '">' +
+//                        '<a class="btn btn-sm green" href="javascript:;" data-toggle="modal_produk" id="add_produk">Tambah Baru</a>';
+                    }
+                })
+                .on("change", function(e) {
+
+                var isExist = false;
+                        var $itemRow = {};
+                        $('.id_produk').each(function (obj) {
+
+                if ($(this).val() == e.val)
+                {
+                isExist = true;
+                        $itemRow = $(this).closest('tr');
+                        return false;
+                }
+                });
+                        if (isExist)
+                {
+                var oldVal = defaultNumeric($itemRow.find('.qty').val(), {{ numericJS() }});
+                        var newVal = displayNumeric(parseFloat(oldVal) + 1, {{ numericJS() }});
+                        $itemRow.find('.qty').val(newVal);
+                        recalculate();
+                        $('#search_item').select2('val', '');
+                }
+                else
+                        getRowProduk(e.val);
+                })
+                .parent().find('.select2-with-searchbox').on('click', '#add_produk', function(){
+
+        var newTerm = $('#new_produk').val();
+                $('#item_name').val(newTerm);
+                $('#modal_produk').modal('show');
+                $("#select2-drop-mask").click();
+        })
+
+                // select kategori bisa add new
+                $("#id_kat").select2({
+        placeholder: "-- Pilih --",
+                maximumInputLength: 100,
+                formatNoMatches: function(term) {
+                return '<input class="form-control" id="new_kategori" value="' + term + '">' +
+                        '<button class="btn btn-sm green filter-submit" id="add_kategori">Tambah Baru</button>'
+                }
+        })
+                .parent().find('.select2-with-searchbox').on('click', '#add_kategori', function(){
+
+        var newTerm = $('#new_kategori').val();
+                var id = newKategori(newTerm);
+                if (id != '')
+        {
+        $('<option value="' + id + '">' + newTerm + '</option>').appendTo('#id_kat');
+                $('#id_kat').select2('val', id); // select the new term
+                $("#id_kat").select2('close'); // close the dropdown
+        }
+        })
+
+                // select satuan bisa add new
+                $("#satuan").select2({
+        placeholder: "-- Pilih --",
+                maximumInputLength: 10,
+                formatNoMatches: function(term) {
+                return '<input class="form-control" id="new_satuan" value="' + term + '">' +
+                        '<button class="btn btn-sm green filter-submit" id="add_satuan">Tambah Baru</button>'
+                }
+        })
+                .parent().find('.select2-with-searchbox').on('click', '#add_satuan', function(){
+
+        var newTerm = $('#new_satuan').val();
+                var id = newSatuan(newTerm);
+                if (id != '')
+        {
+        $('<option value="' + id + '">' + newTerm + '</option>').appendTo('#satuan');
+                $('#satuan').select2('val', id); // select the new term
+                $("#satuan").select2('close'); // close the dropdown
+        }
+        })
+
+                $("#salesman").select2({
+        placeholder: "-- Pilih --",
+                allowClear: true,
+                formatNoMatches: function(term) {
+                return '<input class="form-control" id="new_salesman" value="' + term + '">' +
+                        '<a class="btn btn-sm green" href="javascript:;" data-toggle="modal_salesman" id="add_salesman">Tambah Baru</a>';
+                }
+        })
+                .parent().find('.select2-with-searchbox').on('click', '#add_salesman', function(){
+
+        var newTerm = $('#new_salesman').val();
+                $('#nama_sales').val(newTerm);
+                $('#modal_salesman').modal('show');
+                $("#select2-drop-mask").click();
+        })
+
+                var lastToast;
+                /* END DEFINE ELEMENT  */
+
+                /* BEGIN EVENT HANDLER */
+
+                // tombol full screen
+                $(document).on('click', "#full_screen", function(){
+
+        params = 'width=' + screen.width;
+                params += ', height=' + screen.height;
+                params += ', top=0, left=0'
+                params += ', fullscreen=yes';
+                params += ', scrollbars=yes';
+                newwin = window.open('{{ URL::to(' / ') }}/sales/invoice/new/fullscreen', 'salesInvoiceNew', params);
+                if (window.focus) {newwin.focus()}
+        return false;
+        });
+                $("#no_isauto").click(function()
+        {
+        if ($('#no_isauto').is(':checked'))
+        {
+        $('#no_faktur').val($('#no_auto').val());
+                $('#no_faktur').attr('readonly', true);
+        }
+        else
+        {
+        $('#no_faktur').removeAttr('readonly');
+        }
+        });
+                // datepicker tanggal
+                $('#div_tanggal').datepicker().on('changeDate', function (ev) {
+
+        var tanggal = $('#tanggal').val();
+                var date = moment(tanggal, '{{ Config::get("format.date.moment") }}').add('day', $('#termin_bayar_c').val());
+                var jatuh_tempo = date.format('{{ Config::get("format.date.moment") }}');
+                $('#jatuh_tempo').val(jatuh_tempo);
+        });
+                // tombol delete row
+                $("#datatable tbody").on('click', "a.delete_row", function(){
+        $(this).parents('tr').remove();
+                recalculate();
+        });
+                // event ketika modal_produk ditampilkan
+                $('#modal_produk').on('show', function(e) {
+
+        clearForm('#form_produk');
+                clearError();
+        });
+                // tombol simpan produk
+                $("#modal_produk").on('click', "#save_produk", function(){
+
+        newProduk();
+        });
+                // tombol simpan customer
+                $("#modal_salesman").on('click', "#save_salesman", function(){
+
+        newSalesman();
+        });
+                // tombol simpan customer
+                $("#modal_customer").on('click', "#save_customer", function(){
+
+        newCustomer();
+        });
+                // tombol proses
+                $(".form").on('click', "#process, #save_draft", function(){
+
+        validate($(this).attr('id'));
+        });
+                $("#diskon_global, #biaya").keyup(function() {
+        recalculate();
+        });
+                $("#termin_bayar_c").keyup(function() {
+        var tanggal = $('#tanggal').val();
+                var date = moment(tanggal, '{{ Config::get("format.date.moment") }}').add('day', $('#termin_bayar_c').val());
+                var jatuh_tempo = date.format('{{ Config::get("format.date.moment") }}');
+                $('#jatuh_tempo').val(jatuh_tempo);
+        });
+                $(".qty, .harga_jual, .diskon").keyup(function() {
+        recalculate();
+        });
+                $(".tipe_diskon").change(function() {
+        recalculate();
+        });
+                /* END EVENT HANDLER */
+
+                        /* BEGIN JS FUNCTION */
+
+                                function clearError()
+                                {
+                                $('.item_row').removeClass('has-error');
+                                        $('.form-group').removeClass('has-error');
+                                        $('.form-control').attr('data-original-title', '');
+                                }
+
+                        function getRowCustomer(id)
+                        {
+                        $.ajax({
+                        url: '{{ URL::to(' / ') }}/customer/get_row',
+                                dataType: 'json',
+                                type: 'POST',
+                                data: 'id=' + id,
+                                beforeSend:function(){
+                                Metronic.blockUI();
+                                },
+                                success:function(result){
+                                // var result = eval('('+result+')');
+                                Metronic.unblockUI();
+                                        // alert(result);
+
+                                        $('#customer').select2('val', id);
+                                        $('#termin_bayar_c').val(result.termin_bayar);
+                                        var tanggal = $('#tanggal').val();
+                                        var date = moment(tanggal, '{{ Config::get("format.date.moment") }}').add('day', result.termin_bayar);
+                                        var jatuh_tempo = date.format('{{ Config::get("format.date.moment") }}');
+                                        $('#jatuh_tempo').val(jatuh_tempo);
+                                        if (result.alamat_penagihan)
+                                        $('#alamat_tagih').text(result.alamat_penagihan);
+                                        else
+                                        $('#alamat_tagih').text('');
+                                        if (result.alamat_pengiriman)
+                                        $('#alamat_kirim').text(result.alamat_pengiriman);
+                                        else
+                                        $('#alamat_kirim').text('');
+                                },
+                                error:function(x, h, r)
+                                {
+                                alert(r);
+                                }
+                        })
+                        }
+
+                        function getRowProduk(id)
+                        {
+                        $.ajax({
+                        url: '{{ URL::to('/') }}/item/get_row',
+                                dataType: 'json',
+                                type: 'POST',
+                                data: 'id=' + id,
+                                beforeSend:function(){
+                                Metronic.blockUI();
+                                },
+                                success:function(result){
+                                // var result = eval('('+result+')');
+                                Metronic.unblockUI();
+                                        // alert(result);
+
+                                        $('#search_item').select2('val', '');
+                                        insertRowProduk(result);
+                                        recalculate();
+                                },
+                                error:function(x, h, r)
+                                {
+                                alert(r);
+                                }
+                        })
+                        }
+
+                        function insertRowProduk(data)
+                        {
+                        var $row = $([
+                                '<tr role="row" class="item_row">',
+                                '<td><center><a href="javascript:void(0)" id="tahik" class="btn btn-xs red tooltips delete_row" data-original-title="Hapus"><i class="fa fa-times"></i></a></center></td>',
+                                '<td><input type="hidden" name="produk[' + i + '][id_produk]" class="id_produk"><input type="hidden" name="produk[' + i + '][kode_produk]" class="kode_produk"><input type="text" name="produk[' + i + '][item_name]" class="form-control input-sm item_name" readonly></td>',
+                                '<td><input type="text" name="produk[' + i + '][qty]" class="form-control input-sm currency qty"></td>',
+                                '<td><input type="hidden" name="produk[' + i + '][harga_satuan]" class="harga_satuan"><input type="hidden" name="produk[' + i + '][unit]" class="unit">' + data.unit_name + '</td>',
+                                '<td><input type="hidden" name="produk[' + i + '][harga_beli]" class="harga_beli"><input type="text" name="produk[' + i + '][harga_jual]" class="form-control input-sm currency harga_jual" readonly></td>',
+                                '<td width="7%"><select name="produk[' + i + '][tipe_diskon]" class="form-control input-sm tipe_diskon"><option value="%" selected>%</option><option value="N">Rp</option></select></td>',
+                                '<td width="13%"><input type="hidden" name="produk[' + i + '][diskon_item]" class="diskon_item"><input type="text" name="produk[' + i + '][diskon]" class="form-control input-sm currency diskon"></td>',
+                                '<td><input type="text" name="produk[' + i + '][total_item]" class="form-control input-sm currency total_item" readonly></td>',
+                                '</tr>'
+                        ].join(''));
+                                i++;
+                                $row.find(".qty, .harga_jual, .diskon").keyup(function() {
+                        recalculate();
+                        });
+                                $row.find(".tipe_diskon").change(function() {
+                        recalculate();
+                        });
+                                $row.find('.currency').autoNumeric('init', {{ autoNumeric() }});
+                                $row.find('.id_produk').val(data.id_produk);
+                                $row.find('.kode_produk').val(data.kode_produk);
+                                $row.find('.item_name').val(data.item_name);
+                                $row.find('.qty').val(1);
+                                $row.find('.unit').val(data.unit);
+                                $row.find('.harga_beli').val(displayNumeric(data.harga_beli, {{ numericJS() }}));
+                                $row.find('.harga_jual').val(displayNumeric(data.cogs_price, {{ numericJS() }}));
+                                $('.item_row:last', '#datatable').after($row);
+                                // $row.find('.qty').focus();
+                        }
+
+                        function recalculate()
+                        {
+                        var totalBruto = totalDiskonItem = subTotal = totalDiskon = totalPPN = totalNetto = totalModal = total = biaya = 0;
+                                var isRugi = 0;
+                                var tipeDiskonGlobal = $('#tipe_diskon_global').val();
+                                var totalDiskon = defaultNumeric($("#diskon_global").val(), {{ numericJS() }});
+                                var biaya = defaultNumeric($("#biaya").val(), {{ numericJS() }});
+                                var rowCount = $('.qty').length;
+                                if (rowCount > 0)
+                        {
+                        $('#process, #save_draft').removeAttr('disabled');
+                                for (n = 0; n < rowCount; n++)
+                        {
+                        var qty = defaultNumeric($('.qty:eq(' + n + ')').val(), {{ numericJS() }});
+                                var tipe_diskon = $('.tipe_diskon:eq(' + n + ')').val();
+                                var diskon = defaultNumeric($('.diskon:eq(' + n + ')').val(), {{ numericJS() }});
+                                var harga_jual = defaultNumeric($('.harga_jual:eq(' + n + ')').val(), {{ numericJS() }});
+                                var harga_beli = defaultNumeric($('.harga_beli:eq(' + n + ')').val(), {{ numericJS() }});
+                                totalBruto += (qty * harga_jual)
+
+                                if (tipe_diskon == '%')
+                        {
+                        diskon = harga_jual * diskon / 100;
+                        }
+
+                        var diskon_item = (qty * diskon);
+                                totalDiskonItem += diskon_item;
+                                var harga_satuan = harga_jual - diskon
+                                var total_item = qty * harga_satuan;
+                                subTotal += total_item;
+                                $('.diskon_item:eq(' + n + ')').val(displayNumeric(diskon_item, {{ numericJS() }}));
+                                $('.harga_satuan:eq(' + n + ')').val(displayNumeric(harga_satuan, {{ numericJS() }}));
+                                $('.total_item:eq(' + n + ')').val(displayNumeric(total_item, {{ numericJS() }}));
+                                totalModal += (qty * parseFloat(harga_beli));
+                                if ((harga_jual - diskon) < harga_beli)
+                        {
+                        isRugi = 1;
+                                $('.total_item:eq(' + n + ')').css('border-color', 'red');
+                                $('.total_item:eq(' + n + ')').tooltip().attr('data-original-title', 'Rugi');
+                        }
+                        else
+                        {
+                        $('.total_item:eq(' + n + ')').css('border-color', '');
+                                $('.total_item:eq(' + n + ')').attr('data-original-title', '');
+                        }
+                        }
+                        }
+                        else
+                                $('#process, #save_draft').attr('disabled', true);
+                                // penghitungan diskon
+                                if (tipeDiskonGlobal == '%')
+                                totalDiskon = (subTotal * (totalDiskon / 100));
+                                totalNetto = subTotal - totalDiskon;
+                                total = totalNetto + parseFloat(biaya);
+                                if (totalNetto < totalModal)
+                        {
+                        isRugi = 1;
+                                $('.total').css('border-color', 'red');
+                                $('.total').tooltip().attr('data-original-title', 'Rugi');
+                        }
+                        else
+                        {
+                        $('.total').css('border-color', '');
+                                $('.total').attr('data-original-title', '');
+                        }
+
+                        $('#hpp').val(displayNumeric(totalModal, {{ numericJS() }}));
+                                $('#total_bruto').val(displayNumeric(totalBruto, {{ numericJS() }}));
+                                $('#total_diskon_item').val(displayNumeric(totalDiskonItem, {{ numericJS() }}));
+                                $('#sub_total').val(displayNumeric(subTotal, {{ numericJS() }}));
+                                $('#total_diskon').val(displayNumeric(totalDiskon, {{ numericJS() }}));
+                                $('#total_biaya').val(displayNumeric(biaya, {{ numericJS() }}));
+                                $('#total_netto').val(displayNumeric(totalNetto, {{ numericJS() }}));
+                                $('.total').val(displayNumeric(total, {{ numericJS() }}));
+                                if (isRugi == 1)
+                        {
+                        toastr.clear(lastToast);
+                                lastToast = toastr['error']('Nilai transaksi lebih kecil daripada HPP. Mohon cek kolom total.', 'Terjadi kerugian.');
+                                $('#process, #save_draft').attr('disabled', 'true');
+                        }
+                        else
+                        {
+                        toastr.clear();
+                                if (rowCount > 0)
+                                $('#process, #save_draft').removeAttr('disabled');
+                        }
+
+                        $('.currency').each(function (e) {
+                        var val = defaultNumeric($(this).val(), {{ numericJS() }});
+                                if (val < 0)
+                                $(this).css('color', 'red');
+                                else
+                                $(this).css('color', 'black');
+                        });
+                        }
+
+                        function validate(action)
+                        {
+                        clearError();
+                                console.log(action)
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/sales/invoice/new/validate",
+                                        type:"post",
+                                        data: $('#form').serialize() + '&action=' + action,
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+                                                var alert_msg = '';
+                                                if (result.status)
+                                        {
+                                        $('<input />').attr('type', 'hidden')
+                                                .attr('name', 'action')
+                                                .attr('value', action)
+                                                .appendTo('#form');
+                                                $("#form").submit();
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                                var errors = result.error_msg;
+                                                Object.keys(errors).forEach(function(key) {
+                                        if (errors[key])
+                                        {
+                                        if (key == "produk")
+                                        {
+                                        Object.keys(errors[key]).forEach(function(n) {
+                                        Object.keys(errors[key][n]).forEach(function(keyP) {
+                                        $('.' + keyP + ':eq(' + n + ')').closest('.item_row').addClass('has-error');
+                                                $('.' + keyP + ':eq(' + n + ')').attr("data-original-title", errors[key][n][keyP]).tooltip();
+                                        });
+                                        });
+                                        }
+                                        else
+                                        {
+                                        $('#' + key).closest('.form-group').addClass('has-error');
+                                                $('#' + key).attr("data-original-title", errors[key]).tooltip();
+                                                $('#s2id_' + key).attr("data-original-title", errors[key]).tooltip();
+                                        }
+                                        }
+                                        });
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                        }
+
+                        function newCustomer()
+                        {
+                        clearError();
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/customer/" + $('#act').val(),
+                                        type:"post",
+                                        data: $('#form_customer').serialize(),
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+                                                var alert_msg = '';
+                                                if (result.status)
+                                        {
+                                        $('#modal_customer').modal('hide');
+                                                toastr['success'](result.alert_msg);
+                                                getRowCustomer(result.id);
+                                                if (result.id != '')
+                                        {
+                                        $('<option value="' + result.id + '">' + $('#nama_customer').val() + '</option>').appendTo('#customer');
+                                                $('#customer').select2('val', result.id); // select the new term
+                                                $("#customer").select2('close'); // close the dropdown
+                                        }
+                                        clearForm('#form_customer');
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                                var errors = result.error_msg;
+                                                Object.keys(errors).forEach(function(key) {
+                                        if (errors[key])
+                                        {
+                                        $('#' + key).closest('.form-group').addClass('has-error');
+                                                $('#' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                                $('#s2id_' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                        }
+                                        });
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                        }
+
+                        function newSalesman()
+                        {
+                        clearError();
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/salesman/" + $('#act').val(),
+                                        type:"post",
+                                        data: $('#form_salesman').serialize(),
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+                                                var alert_msg = '';
+                                                if (result.status)
+                                        {
+                                        $('#modal_salesman').modal('hide');
+                                                toastr['success'](result.alert_msg);
+                                                if (result.id != '')
+                                        {
+                                        $('<option value="' + result.id + '">' + $('#nama_sales').val() + '</option>').appendTo('#salesman');
+                                                $('#salesman').select2('val', result.id); // select the new term
+                                                $("#salesman").select2('close'); // close the dropdown
+                                        }
+                                        clearForm('#form_salesman');
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                                var errors = result.error_msg;
+                                                Object.keys(errors).forEach(function(key) {
+                                        if (errors[key])
+                                        {
+                                        $('#' + key).closest('.form-group').addClass('has-error');
+                                                $('#' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                                $('#s2id_' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                        }
+                                        });
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                        }
+
+                        function newProduk()
+                        {
+                        clearError();
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/product/" + $('#act').val(),
+                                        type:"post",
+                                        data: $('#form_produk').serialize(),
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+                                                var alert_msg = '';
+                                                if (result.status)
+                                        {
+                                        clearForm('#form_produk');
+                                                $('#modal_produk').modal('hide');
+                                                toastr['success'](result.alert_msg);
+                                                getRowProduk(result.id);
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                                var errors = result.error_msg;
+                                                Object.keys(errors).forEach(function(key) {
+                                        if (errors[key])
+                                        {
+                                        $('#' + key).closest('.form-group').addClass('has-error');
+                                                $('#' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                                $('#s2id_' + key).attr("data-original-title", errors[key]).attr("data-placement", "bottom").tooltip();
+                                        }
+                                        });
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                        }
+
+                        function newKategori(nama_kategori)
+                        {
+                        var id = '';
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/product_category/add",
+                                        async: false,
+                                        type:"post",
+                                        data: 'nama_kategori=' + nama_kategori + '&from=dropdown',
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+
+                                                id = result.id;
+                                                if (result.status)
+                                        {
+                                        toastr['success'](result.alert_msg);
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                                return id;
+                        }
+
+                        function newSatuan(satuan)
+                        {
+                        var id = '';
+                                $.ajax({
+                                url: "{{ URL::to('/') }}/metric/add",
+                                        async: false,
+                                        type:"post",
+                                        data: 'satuan=' + satuan + '&from=dropdown',
+                                        beforeSend:function(){
+                                        Metronic.blockUI();
+                                        },
+                                        success:function(result){
+                                        var result = eval('(' + result + ')');
+                                                Metronic.unblockUI();
+                                                // alert(result);
+
+                                                id = result.id;
+                                                if (result.status)
+                                        {
+                                        toastr['success'](result.alert_msg);
+                                        }
+                                        else
+                                        {
+                                        toastr['error'](result.alert_msg);
+                                        }
+                                        },
+                                        error:function(x, h, r)
+                                        {
+                                        alert(r);
+                                        }
+                                })
+                                return id;
+                        }
+
+                        /* END JS FUNCTION */
+
+                        };
+                        jQuery(document).ready(function() {
+                Metronic.init(); // init metronic core components
+                        Layout.init(); // init current layout
+                        construct();
+                        @if (Session::get('alert') == 'success')
+                        toastr['success']('{{ Session::get("alert_msg") }}');
+                        @endif
+                });
+</script>
+@stop
+
+@section('content')
+
+@if(!$is_fullscreen)
+<!-- BEGIN PAGE HEADER-->
+<div class="row">
+    <div class="col-md-12">
+        <!-- BEGIN PAGE TITLE & BREADCRUMB-->
+        <h3 class="page-title">
+            {{{ $title or '' }}} <small>{{{ $title_desc or '' }}}</small>
+        </h3>
+        <ul class="page-breadcrumb breadcrumb">
+            <li>
+                <i class="fa fa-home"></i>
+                <a href="#">Procurement</a>
+                <i class="fa fa-angle-right"></i>
+            </li>
+            <li>
+                <a href="#">Purchase Order</a>
+                <i class="fa fa-angle-right"></i>
+            </li>
+            <li>
+                <a href="#">{{{ $title or '' }}}</a>
+            </li>
+        </ul>
+        <!-- END PAGE TITLE & BREADCRUMB-->
+    </div>
+</div>
+<!-- END PAGE HEADER-->
+@endif
+
+<!-- BEGIN PAGE CONTENT-->
+<!-- BEGIN FORM-->
+<form id="form" method="post" action="{{ URL::to('/') }}/sales/invoice/new" class="form-horizontal">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="portlet yellow-crusta box">
+                <div class="portlet-title">
+                    <div class="caption"><i class="fa fa-clipboard"></i>PO Detail</div>
+                    <div class="tools">
+                        <a href="javascript:;" class="collapse">
+                        </a>
+                    </div>
+                </div>
+                <div class="portlet-body form">
+                    <div class="form-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">PO No</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('po_no', $po_no, array('id' => 'po_no', 'class' => 'form-control digits', 'maxlength' => 8)) }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Vendor</label>
+                                    <div class="col-md-3">
+                                        {{ Form::select('vendor', $listVendors, null, array('id' => 'vendor', 'class'=>'form-control form-filter select2 input-md')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">PO Date</label>
+                                    <div class="input-group date date-picker col-md-3" data-date-format="{{ Config::get('format.date.default') }}">
+                                        {{ Form::text('po_date', date('d-m-Y'), array('class' => 'form-control form-filter input-sm', 'readonly' => true)) }}
+                                        <span class="input-group-btn">
+                                            <button class="btn btn-sm default" type="button"><i class="fa fa-calendar"></i></button>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Address</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('address', '', array('id' => 'address', 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Tax</label>
+                                    <div class="col-md-3">
+                                        {{ Form::checkbox('tax', 1, array('id' => 'tax', 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">No Ref</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('po_id', $po_no, array('id' => 'po_no', 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Currency</label>
+                                    <div class="col-md-3">
+                                        {{ Form::select('currency', $listCurrencies, null, array('id' => 'currency', 'class'=>'form-control form-filter select2 input-md')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Total</label>
+                                    <div class="col-md-3">
+                                        {{ Form::text('po_id', $po_no, array('id' => 'po_no', 'class' => 'form-control', 'readonly' => true)) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label class="control-label col-md-3">Notes</label>
+                                    <div class="col-md-3">
+                                        {{ Form::textarea('notes', '', array('id' => 'po_no', 'rows' => 2, 'class' => 'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <?php $id_trx = isset($data['id_trx']) ? $data['id_trx'] : null; ?>
+                    <?php $no_faktur = isset($data) ? $data['no_faktur'] : $no_faktur; ?>
+                    <?php $tanggal = isset($data) ? $data['tanggal'] : date(Config::get('format.date.php')); ?>
+                    <?php $salesman = isset($data) ? $data['salesman'] : ''; ?>
+                    <?php $tipe_diskon_global = isset($data) ? $data['tipe_diskon_global'] : '%'; ?>
+                    <?php $diskon_global = isset($data) ? $data['diskon_global'] : ''; ?>
+                    <?php $biaya = isset($data) ? $data['biaya'] : ''; ?>
+                    <?php $total = isset($data) ? $data['total'] : ''; ?>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="portlet box red">
+                <div class="portlet-title">
+                    <div class="caption"><i class="fa fa-file"></i>Item</div>
+                    <div class="tools">
+                        <a href="javascript:;" class="collapse">
+                        </a>
+                    </div>
+                </div>
+                <div class="portlet-body form">
+                    <div class="form-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-group">
+                                    <label class="control-label col-md-2">Search Item</label>
+                                    <div class="col-md-10">
+                                        {{ Form::text('search_item','',array('id'=>'search_item','class'=>'form-control')) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!--/row-->
+                        <div class="table-container">
+                            <table class="table table-striped table-bordered table-hover" id="datatable">
+                                <thead>
+                                    <tr role="row" class="heading">
+                                        <th width="5%">#</th>
+                                        <th width="25%">Item Name</th>
+                                        <th colspan="2" width="15%">Qty</th>
+                                        <th width="15%">Price @</th>
+                                        <th colspan="2" width="20%">Disc</th>
+                                        <th width="15%">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr role="row" class="item_row"></tr>
+                                    @if(isset($data))
+                                    <?php $i = 0; ?>
+                                    @foreach($data['produk'] as $p)
+                                    <tr role="row" class="item_row">
+                                        <td><center><a href="javascript:;" class="btn btn-xs red tooltips delete_row" data-original-title="Hapus"><i class="fa fa-times"></i></a></center></td>
+                                <td><input type="hidden" name="produk[ {{ $i }} ][id_produk]" value="{{ $p['id_produk'] }}" class="id_produk"><input type="hidden" name="produk[ {{ $i }} ][kode_produk]" value="{{ $p['kode_produk'] }}" class="kode_produk"><input type="text" name="produk[ {{ $i }} ][item_name]" value="{{ $p['item_name'] }}" class="form-control input-sm item_name" readonly></td>
+                                <td><input type="text" name="produk[ {{ $i }} ][qty]" value="{{ $p['qty'] }}" class="form-control input-sm currency qty"></td>
+                                <td><input type="hidden" name="produk[ {{ $i }} ][harga_satuan]" value="{{ $p['harga_satuan'] }}" class="harga_satuan"><input type="hidden" name="produk[ {{ $i }} ][unit]" value="{{ $p['unit'] }}" class="unit">{{ $p['unit'] }}</td>
+                                <td><input type="hidden" name="produk[ {{ $i }} ][harga_beli]" value="{{ $p['harga_beli'] }}" class="harga_beli"><input type="text" name="produk[ {{ $i }} ][harga_jual]" value="{{ $p['harga_jual'] }}" class="form-control input-sm currency harga_jual" readonly></td>
+                                <td width="7%"><select name="produk[ {{ $i }} ][tipe_diskon]" class="form-control input-sm tipe_diskon"><option value="%" {{ $p['tipe_diskon']=='%' ? 'selected' : '' }} >%</option><option value="N" {{ $p['tipe_diskon']=='N' ? 'selected' : '' }} >Rp</option></select></td>
+                                <td width="13%"><input type="hidden" name="produk[ {{ $i }} ][diskon_item]" value="{{ $p['diskon_item'] }}"  class="diskon_item"><input type="text" name="produk[ {{ $i }} ][diskon]" value="{{ $p['diskon'] }}" class="form-control input-sm currency diskon"></td>
+                                <td><input type="text" name="produk[ {{ $i }} ][total_item]" value="{{ $p['total_item'] }}"  class="form-control input-sm currency total_item" readonly></td>
+                                </tr>
+                                <?php $i++; ?>
+                                @endforeach
+                                @endif
+                                </tbody>
+                                <tfoot>
+                                    <tr role="row">
+                                        <th colspan="2" rowspan="4">
+                                        </th>
+                                        <th colspan="5" class="alignRight">Sub Total</th>
+                                        <td>
+                                            <?php $total_bruto = isset($data) ? $data['total_bruto'] : ''; ?>
+                                            {{ Form::hidden('total_bruto',$total_bruto,array('id'=>'total_bruto')) }}
+                                            <?php $sub_total = isset($data) ? $data['sub_total'] : ''; ?>
+                                            {{ Form::text('sub_total',$sub_total,array('id'=>'sub_total','class'=>'form-control currency','readonly'=>'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th colspan="5" class="alignRight">Total Diskon</th>
+                                        <td>
+                                            <?php $total_diskon_item = isset($data) ? $data['total_diskon_item'] : ''; ?>
+                                            {{ Form::hidden('total_diskon_item',$total_diskon_item,array('id'=>'total_diskon_item')) }}
+                                            <?php $total_diskon = isset($data) ? $data['total_diskon'] : ''; ?>
+                                            {{ Form::text('total_diskon',$total_diskon,array('id'=>'total_diskon','class'=>'form-control currency','readonly'=>'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th colspan="5" class="alignRight">Biaya</th>
+                                        <td>
+                                            {{ Form::text('total_biaya',$biaya,array('id'=>'total_biaya','class'=>'form-control currency','readonly'=>'true')) }}
+                                        </td>
+                                    </tr>
+                                    <tr role="row">
+                                        <th colspan="5" class="alignRight">Total</th>
+                                        <td>
+                                            <?php $hpp = isset($data) ? $data['hpp'] : ''; ?>
+                                            {{ Form::hidden('hpp',$hpp,array('id'=>'hpp')) }}
+                                            <?php $total_netto = isset($data) ? $data['total_netto'] : ''; ?>
+                                            {{ Form::hidden('total_netto',$total_netto,array('id'=>'total_netto')) }}
+                                            <?php $total = isset($data) ? $data['total'] : ''; ?>
+                                            {{ Form::text('total',$total,array('class'=>'form-control currency total','readonly'=>'true','style'=>'font-weight:bold;')) }}
+                                        </td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="form-actions fluid">
+                        <div class="col-md-offset-{{ $new ? '4' : '5' }} col-md-7">
+                            @if($new)
+                            <button type="button" id="save_draft" class="btn yellow">Simpan Draft</button>
+                            @else
+                            <a href="{{ URL::to('/') }}/sales/invoice/detail/{{ encode($data['id_trx']) }}" class="btn default">Kembali</a>
+                            @endif
+                            <button type="button" id="process" class="btn blue">Proses</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+<!-- END FORM-->
+
+
+
+<!-- END PAGE CONTENT-->
+@stop

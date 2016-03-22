@@ -1,0 +1,23 @@
+<?php
+
+class GeneralModel 
+{
+	public static function getSelectionList($table, $idCol, $nameCol, $whereArr=null)
+	{			
+		$query = DB::table($table)
+						->select($idCol,$nameCol)
+						->where('is_deleted',0)
+						->where('owner', Crypt::decrypt(Session::get('owner')));
+		
+		if($whereArr)
+		{
+			foreach($whereArr as $col=>$val)
+			{
+				$opval = explode(' ',$val);
+				$query->where($col,$opval[0],$opval[1]);
+			}
+		}
+		$data = $query->orderBy($nameCol)->get();
+		
+		return listArray($data,$idCol, $nameCol);
+	}
